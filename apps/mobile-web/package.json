@@ -1,0 +1,27 @@
+{
+  "name": "@panenin/mobile-web",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "format": "echo \"No formatter configured yet\""
+  },
+  "dependencies": {
+    "@panenin/types": "workspace:*",
+    "@panenin/ui": "workspace:*",
+    "@panenin/utils": "workspace:*",
+    "next": "^15.3.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.21",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.8.3"
+  }
+}
