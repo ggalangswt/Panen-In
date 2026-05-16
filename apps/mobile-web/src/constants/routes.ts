@@ -1,0 +1,16 @@
+export const AppRoutes = {
+  splash: "/",
+  login: "/login",
+  legacyLogin: "/lpgin",
+  register: "/register",
+  home: "/home",
+  consultation: "/consultation",
+  calculator: "/calculator",
+  plantingGuide: "/planting-guide",
+  weather: "/weather",
+  notes: "/notes",
+  profile: "/profile",
+  profilePersonalInfo: "/profile/personal-info",
+  profileNotifications: "/profile/notifications",
+  profilePrivacySecurity: "/profile/privacy-security",
+} as const;

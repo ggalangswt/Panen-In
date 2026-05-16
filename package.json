@@ -5,9 +5,13 @@
   "packageManager": "pnpm@10.0.0",
   "scripts": {
     "dev": "turbo run dev",
+    "dev:web": "pnpm --filter @panenin/mobile-web dev",
     "build": "turbo run build",
+    "build:web": "pnpm --filter @panenin/mobile-web build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "typecheck:web": "pnpm --filter @panenin/mobile-web typecheck",
+    "clean:web": "pnpm --filter @panenin/mobile-web clean",
     "format": "turbo run format"
   },
   "devDependencies": {

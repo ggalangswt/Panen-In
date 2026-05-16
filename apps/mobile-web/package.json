@@ -3,12 +3,13 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node ./scripts/run-next.mjs dev .next-dev",
+    "build": "node ./scripts/run-next.mjs build .next-build",
+    "start": "node ./scripts/run-next.mjs start .next-build",
     "lint": "next lint",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "format": "echo \"No formatter configured yet\""
+    "format": "echo \"No formatter configured yet\"",
+    "clean": "node ./scripts/clean-next.mjs"
   },
   "dependencies": {
     "@panenin/types": "workspace:*",
@@ -19,9 +20,12 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
     "@types/node": "^22.15.21",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "postcss": "^8.5.14",
+    "tailwindcss": "^4.3.0",
     "typescript": "^5.8.3"
   }
 }
