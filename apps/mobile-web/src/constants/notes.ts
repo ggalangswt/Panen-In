@@ -1,0 +1,60 @@
+export const harvestNotes = [
+  {
+    id: "padi-musim-1",
+    plant: "Padi",
+    emoji: "🌾",
+    status: "Untung",
+    summary: "Rp 2,6jt keuntungan - 850 kg hasil panen",
+    financial: {
+      profit: "Rp 2.600.000",
+      modal: "Rp 4,2jt",
+      revenue: "Rp 6,8jt",
+      margin: "38%",
+    },
+    activities: [
+      { date: "10 Apr", title: "Tanam Padi", description: "850 bibit ditanam" },
+      { date: "25 Apr", title: "Pupuk pertama", description: "Urea 50kg" },
+      { date: "12 Mei", title: "Hama wereng muncul", description: "Semprot insektisida 2x" },
+      { date: "03 Jun", title: "Pupuk kedua", description: "NPK 30kg sesuai jadwal" },
+      { date: "15 Jul", title: "Panen", description: "850 kg hasil, harga Rp 8.000/kg" },
+    ],
+  },
+  {
+    id: "jagung-musim-2",
+    plant: "Jagung",
+    emoji: "🌽",
+    status: "Untung",
+    summary: "Rp 1,8jt keuntungan - 620 kg hasil panen",
+    financial: {
+      profit: "Rp 1.800.000",
+      modal: "Rp 3,1jt",
+      revenue: "Rp 4,9jt",
+      margin: "37%",
+    },
+    activities: [
+      { date: "06 Jan", title: "Tanam Jagung", description: "620 benih ditanam" },
+      { date: "18 Jan", title: "Pupuk dasar", description: "NPK 25kg" },
+      { date: "07 Feb", title: "Monitoring ulat", description: "Penyemprotan ringan" },
+      { date: "23 Mar", title: "Panen", description: "620 kg hasil, harga Rp 7.900/kg" },
+    ],
+  },
+  {
+    id: "cabai-musim-3",
+    plant: "Cabai",
+    emoji: "🌶️",
+    status: "Waspada",
+    summary: "Rp 900rb keuntungan - 240 kg hasil panen",
+    financial: {
+      profit: "Rp 900.000",
+      modal: "Rp 2,4jt",
+      revenue: "Rp 3,3jt",
+      margin: "27%",
+    },
+    activities: [
+      { date: "14 Agu", title: "Tanam Cabai", description: "240 bibit ditanam" },
+      { date: "29 Agu", title: "Cek thrips", description: "Daun muda dipantau" },
+      { date: "12 Sep", title: "Pemupukan", description: "Pupuk cair 10 liter" },
+      { date: "10 Okt", title: "Panen awal", description: "240 kg hasil, harga Rp 13.750/kg" },
+    ],
+  },
+] as const;
