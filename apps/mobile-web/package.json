@@ -12,6 +12,7 @@
     "clean": "node ./scripts/clean-next.mjs"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@panenin/types": "workspace:*",
     "@panenin/ui": "workspace:*",
     "@panenin/utils": "workspace:*",
