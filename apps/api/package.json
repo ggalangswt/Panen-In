@@ -13,6 +13,7 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "axios": "^1.16.1",
+    "firebase-admin": "^13.10.0",
     "next": "latest",
     "typescript": "latest"
   }
