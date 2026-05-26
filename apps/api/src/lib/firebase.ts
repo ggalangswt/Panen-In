@@ -1,19 +1,29 @@
 import * as admin from 'firebase-admin'
 
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        // Mengatasi masalah format newline pada private key di beberapa OS
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      }),
-    })
-    console.log('✅ Firebase Admin SDK berhasil diinisialisasi')
-  } catch (error) {
-    console.error('❌ Gagal inisialisasi Firebase Admin SDK:', error)
+function getFirebaseApp() {
+  if (admin.apps.length) {
+    return admin.app()
   }
+
+  const projectId = process.env.FIREBASE_PROJECT_ID
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error(
+      'Missing Firebase Admin credentials: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are required',
+    )
+  }
+
+  return admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId,
+      clientEmail,
+      privateKey,
+    }),
+  })
 }
 
-export const messaging = admin.messaging()
+export function getMessaging() {
+  return getFirebaseApp().messaging()
+}

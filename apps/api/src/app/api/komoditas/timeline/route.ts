@@ -1,24 +1,32 @@
-import { supabaseServer } from '@/lib/supabase-server'
+import { requireAuthenticatedUser } from '@/lib/auth'
+import { badRequest, handleRouteError, notFound } from '@/lib/http'
+import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireAuthenticatedUser(request)
     const { searchParams } = new URL(request.url)
     const catatan_panen_id = searchParams.get('id')
 
     if (!catatan_panen_id) {
-      return NextResponse.json({ error: 'id catatan_panen wajib diisi' }, { status: 400 })
+      return badRequest('id catatan_panen wajib diisi')
     }
 
     // Ambil data catatan_panen berserta relasi kalkulator_usaha sesuai ERD kamu
-    const { data: komoditas, error: dbError } = await supabaseServer
+    const supabaseAdmin = getSupabaseAdmin()
+    const { data: komoditas, error: dbError } = await supabaseAdmin
       .from('catatan_panen')
       .select('*, kalkulator_usaha(*)')
       .eq('id', catatan_panen_id)
+      .eq('user_id', user.id)
       .single()
 
     if (dbError || !komoditas) {
-      return NextResponse.json({ error: 'Data komoditas tidak ditemukan' }, { status: 404 })
+      return notFound('Data komoditas tidak ditemukan')
     }
 
     const timelineEvents = []
@@ -97,7 +105,7 @@ export async function GET(request: NextRequest) {
       timeline: timelineEvents
     })
 
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch (error) {
+    return handleRouteError(error)
   }
 }

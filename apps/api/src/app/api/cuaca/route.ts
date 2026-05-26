@@ -1,27 +1,34 @@
 import { getCuaca } from '@/lib/openweather'
-import { geminiModel } from '@/lib/gemini'
-import { supabaseServer } from '@/lib/supabase-server'
+import { requireAuthenticatedUser } from '@/lib/auth'
+import { getGeminiModel } from '@/lib/gemini'
+import { badRequest, handleRouteError } from '@/lib/http'
+import { getSupabaseAdmin } from '@/lib/supabase-server'
+import { normalizeKabupaten } from '@/lib/weather'
 import { NextRequest, NextResponse } from 'next/server'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireAuthenticatedUser(request)
     const { searchParams } = new URL(request.url)
-    const user_id = searchParams.get('user_id')
     const kabupaten = searchParams.get('kabupaten')
 
-    if (!user_id || !kabupaten) {
-      return NextResponse.json(
-        { error: 'user_id dan kabupaten wajib diisi' },
-        { status: 400 }
-      )
+    if (!kabupaten) {
+      return badRequest('kabupaten wajib diisi')
     }
 
+    const kabupaten_normalized = normalizeKabupaten(kabupaten)
+    const supabaseAdmin = getSupabaseAdmin()
+
     // Cek cache dulu — kalau kurang dari 1 jam, pakai cache
-    const { data: cache } = await supabaseServer
+    const { data: cache } = await supabaseAdmin
       .from('cuaca_cache')
       .select('*')
-      .eq('user_id', user_id)
-      .single()
+      .eq('user_id', user.id)
+      .eq('kabupaten_normalized', kabupaten_normalized)
+      .maybeSingle()
 
     const satu_jam_lalu = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 
@@ -50,18 +57,21 @@ export async function GET(request: NextRequest) {
       Jawab hanya dengan kalimat sarannya saja, tanpa tambahan apapun.
     `
 
-    const result = await geminiModel.generateContent(prompt)
+    const result = await getGeminiModel().generateContent(prompt)
     const rekomendasi_ai = result.response.text().trim()
 
     // Simpan ke cache (upsert)
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabaseAdmin
       .from('cuaca_cache')
       .upsert({
-        user_id,
+        user_id: user.id,
         kabupaten,
+        kabupaten_normalized,
         data_cuaca,
         rekomendasi_ai,
-        fetched_at: new Date().toISOString()
+        fetched_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id,kabupaten_normalized',
       })
       .select()
       .single()
@@ -74,10 +84,7 @@ export async function GET(request: NextRequest) {
       data
     })
 
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleRouteError(error)
   }
 }

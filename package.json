@@ -14,6 +14,13 @@
     "clean:web": "pnpm --filter @panenin/mobile-web clean",
     "format": "turbo run format"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@firebase/util",
+      "protobufjs",
+      "sharp"
+    ]
+  },
   "devDependencies": {
     "turbo": "^2.0.0",
     "typescript": "^5.8.3"

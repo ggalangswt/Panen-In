@@ -1,24 +1,22 @@
-import { supabaseServer } from '@/lib/supabase-server'
-import { geminiModel } from '@/lib/gemini'
+import { requireAuthenticatedUser } from '@/lib/auth'
+import { getGeminiModel } from '@/lib/gemini'
+import { handleRouteError } from '@/lib/http'
+import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const user_id = searchParams.get('user_id')
-
-    if (!user_id) {
-      return NextResponse.json(
-        { error: 'user_id wajib diisi' },
-        { status: 400 }
-      )
-    }
+    const user = await requireAuthenticatedUser(request)
 
     // Ambil semua catatan panen user
-    const { data: catatan, error } = await supabaseServer
+    const supabaseAdmin = getSupabaseAdmin()
+    const { data: catatan, error } = await supabaseAdmin
       .from('catatan_panen')
       .select('*, kalkulator_usaha(*)')
-      .eq('user_id', user_id)
+      .eq('user_id', user.id)
       .not('tanggal_panen_aktual', 'is', null)
       .order('created_at', { ascending: false })
       .limit(10)
@@ -56,7 +54,7 @@ export async function GET(request: NextRequest) {
       Gunakan bahasa sehari-hari, hindari istilah teknis. Jangan gunakan format teks Markdown seperti tanda bintang () atau simbol penanda lainnya, berikan teks polos saja.
     `
 
-    const result = await geminiModel.generateContent(prompt)
+    const result = await getGeminiModel().generateContent(prompt)
     const ringkasan = result.response.text().trim()
 
     return NextResponse.json({
@@ -65,10 +63,7 @@ export async function GET(request: NextRequest) {
       ringkasan
     })
 
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleRouteError(error)
   }
 }

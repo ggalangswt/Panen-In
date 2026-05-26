@@ -1,18 +1,21 @@
-import { geminiModel } from '@/lib/gemini'
-import { supabaseServer } from '@/lib/supabase-server'
+import { requireAuthenticatedUser } from '@/lib/auth'
+import { getGeminiModel } from '@/lib/gemini'
+import { badRequest, handleRouteError } from '@/lib/http'
+import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAuthenticatedUser(request)
     const body = await request.json()
-    const { user_id, jenis_tanaman, metode_input, pertanyaan } = body
+    const { jenis_tanaman, metode_input, pertanyaan } = body
 
     // Validasi input
-    if (!user_id || !jenis_tanaman || !pertanyaan) {
-      return NextResponse.json(
-        { error: 'user_id, jenis_tanaman, dan pertanyaan wajib diisi' },
-        { status: 400 }
-      )
+    if (!jenis_tanaman || !pertanyaan) {
+      return badRequest('jenis_tanaman dan pertanyaan wajib diisi')
     }
 
     // Kirim ke Gemini
@@ -30,7 +33,7 @@ export async function POST(request: NextRequest) {
       Jawab hanya dengan JSON, tanpa teks tambahan.
     `
 
-    const result = await geminiModel.generateContent(prompt)
+    const result = await getGeminiModel().generateContent(prompt)
     const responseText = result.response.text()
     
     // Parse JSON dari Gemini
@@ -38,10 +41,11 @@ export async function POST(request: NextRequest) {
     const hasil_ai = JSON.parse(cleanJson)
 
     // Simpan ke Supabase
-    const { data, error } = await supabaseServer
+    const supabaseAdmin = getSupabaseAdmin()
+    const { data, error } = await supabaseAdmin
       .from('konsultasi')
       .insert({
-        user_id,
+        user_id: user.id,
         jenis_tanaman,
         metode_input: metode_input || 'teks',
         pertanyaan,
@@ -57,10 +61,7 @@ export async function POST(request: NextRequest) {
       data 
     })
 
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleRouteError(error)
   }
 }

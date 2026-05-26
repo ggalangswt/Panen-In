@@ -1,12 +1,17 @@
-import { supabaseServer } from '@/lib/supabase-server'
-import { geminiModel } from '@/lib/gemini'
+import { requireAuthenticatedUser } from '@/lib/auth'
+import { getGeminiModel } from '@/lib/gemini'
+import { badRequest, handleRouteError } from '@/lib/http'
+import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAuthenticatedUser(request)
     const body = await request.json()
     const {
-      user_id,
       kalkulator_id,
       jenis_tanaman,
       tanggal_tanam,
@@ -17,16 +22,32 @@ export async function POST(request: NextRequest) {
       masalah
     } = body
 
-    if (!user_id || !jenis_tanaman || !tanggal_tanam) {
-      return NextResponse.json(
-        { error: 'user_id, jenis_tanaman, dan tanggal_tanam wajib diisi' },
-        { status: 400 }
-      )
+    if (!jenis_tanaman || !tanggal_tanam) {
+      return badRequest('jenis_tanaman dan tanggal_tanam wajib diisi')
+    }
+
+    const supabaseAdmin = getSupabaseAdmin()
+
+    if (kalkulator_id) {
+      const { data: kalkulator, error: kalkulatorError } = await supabaseAdmin
+        .from('kalkulator_usaha')
+        .select('id, user_id')
+        .eq('id', kalkulator_id)
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (kalkulatorError) {
+        throw kalkulatorError
+      }
+
+      if (!kalkulator) {
+        return badRequest('kalkulator_id tidak valid untuk user ini')
+      }
     }
 
     // Generate ringkasan AI kalau data panen sudah lengkap
     let ringkasan_ai = null
-    if (hasil_aktual_kg && harga_jual) {
+    if (hasil_aktual_kg != null && harga_jual != null) {
       const total_pendapatan = hasil_aktual_kg * harga_jual
       const prompt = `
         Petani menanam ${jenis_tanaman}.
@@ -40,14 +61,14 @@ export async function POST(request: NextRequest) {
         Buat ringkasan singkat 2-3 kalimat dalam bahasa Indonesia yang sederhana.
         Sertakan apakah musim ini berhasil atau tidak dan saran untuk musim berikutnya.
       `
-      const result = await geminiModel.generateContent(prompt)
+      const result = await getGeminiModel().generateContent(prompt)
       ringkasan_ai = result.response.text().trim()
     }
 
-    const { data, error } = await supabaseServer
+    const { data, error } = await supabaseAdmin
       .from('catatan_panen')
       .insert({
-        user_id,
+        user_id: user.id,
         kalkulator_id: kalkulator_id || null,
         jenis_tanaman,
         tanggal_tanam,
@@ -66,34 +87,27 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ status: 'success', data })
 
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch (error) {
+    return handleRouteError(error)
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const user_id = searchParams.get('user_id')
+    const user = await requireAuthenticatedUser(request)
 
-    if (!user_id) {
-      return NextResponse.json(
-        { error: 'user_id wajib diisi' },
-        { status: 400 }
-      )
-    }
-
-    const { data, error } = await supabaseServer
+    const supabaseAdmin = getSupabaseAdmin()
+    const { data, error } = await supabaseAdmin
       .from('catatan_panen')
       .select('*, kalkulator_usaha(*)')
-      .eq('user_id', user_id)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
     if (error) throw error
 
     return NextResponse.json({ status: 'success', data })
 
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  } catch (error) {
+    return handleRouteError(error)
   }
 }
