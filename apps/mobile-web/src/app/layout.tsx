@@ -13,8 +13,50 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "PanenIn",
-  description: "Mobile-first farming assistant for Indonesian farmers.",
+  metadataBase: new URL("https://panenin.vercel.app"),
+  applicationName: "PanenIn",
+  title: {
+    default: "PanenIn",
+    template: "%s | PanenIn",
+  },
+  description:
+    "Asisten tani digital untuk petani Indonesia: cuaca harian, kalkulator usaha tani, catatan panen, dan konsultasi AI.",
+  keywords: [
+    "PanenIn",
+    "petani Indonesia",
+    "pertanian",
+    "cuaca pertanian",
+    "kalkulator usaha tani",
+    "catatan panen",
+    "konsultasi AI",
+  ],
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/panenin-logo.png", type: "image/png" }],
+    apple: [{ url: "/panenin-logo.png", type: "image/png" }],
+    shortcut: ["/panenin-logo.png"],
+  },
+  openGraph: {
+    title: "PanenIn",
+    description:
+      "Asisten tani digital untuk petani Indonesia: cuaca harian, kalkulator usaha tani, catatan panen, dan konsultasi AI.",
+    type: "website",
+    locale: "id_ID",
+    siteName: "PanenIn",
+    images: [
+      {
+        url: "/panenin-logo.png",
+        alt: "Logo aplikasi PanenIn",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "PanenIn",
+    description:
+      "Asisten tani digital untuk petani Indonesia: cuaca harian, kalkulator usaha tani, catatan panen, dan konsultasi AI.",
+    images: ["/panenin-logo.png"],
+  },
 };
 
 export const viewport: Viewport = {
@@ -22,6 +64,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
+  themeColor: "#2d6a2d",
 };
 
 type RootLayoutProps = {
