@@ -17,7 +17,30 @@ import {
 import { AppRoutes } from "@/constants/routes";
 import { ConsultationResultCard } from "@/features/consultation/components/ConsultationResultCard";
 import { ConsultationSymptomGrid } from "@/features/consultation/components/ConsultationSymptomGrid";
-import { createConsultation, type ConsultationAiResult } from "@/services/panenin-api";
+import {
+  createConsultation,
+  createHarvestNote,
+  type ConsultationAiResult,
+} from "@/services/panenin-api";
+
+function buildConsultationNoteProblem(problem: string, result: ConsultationAiResult) {
+  return [
+    `Keluhan petani: ${problem}`,
+    "",
+    "Kemungkinan penyebab:",
+    ...result.penyebab.map((item) => `- ${item}`),
+    "",
+    "Rekomendasi tindakan:",
+    ...result.rekomendasi.map((item) => `- ${item}`),
+    "",
+    "Tips pencegahan:",
+    ...result.pencegahan.map((item) => `- ${item}`),
+  ].join("\n");
+}
+
+function getTodayDateString() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export default function ConsultationPage() {
   const router = useRouter();
@@ -27,6 +50,7 @@ export default function ConsultationPage() {
   const [showResult, setShowResult] = useState(false);
   const [result, setResult] = useState<ConsultationAiResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [savingNote, setSavingNote] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   const activeProblem = customProblem.trim() || selectedSymptom;
@@ -61,6 +85,29 @@ export default function ConsultationPage() {
       );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSaveToNotes = async () => {
+    if (!result) return;
+
+    setSavingNote(true);
+    setErrorMessage("");
+
+    try {
+      const note = await createHarvestNote({
+        jenis_tanaman: selectedPlantLabel,
+        tanggal_tanam: getTodayDateString(),
+        masalah: buildConsultationNoteProblem(activeProblem, result),
+      });
+
+      router.push(AppRoutes.noteDetail(note.id));
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal menyimpan hasil konsultasi ke catatan.",
+      );
+    } finally {
+      setSavingNote(false);
     }
   };
 
@@ -139,6 +186,9 @@ export default function ConsultationPage() {
               title="Tips Pencegahan"
               items={result?.pencegahan ?? []}
             />
+            {errorMessage ? (
+              <p className="text-[12px] leading-[18px] text-[#b82c2c]">{errorMessage}</p>
+            ) : null}
           </div>
 
           <StickyActionBar>
@@ -147,9 +197,10 @@ export default function ConsultationPage() {
                 fullWidth
                 variant="light"
                 className="border border-[#c6dfc6] bg-[#ebf5eb] text-[15px] leading-[22.5px] text-[#2d6a2d]"
-                disabled
+                disabled={savingNote}
+                onClick={handleSaveToNotes}
               >
-                Simpan ke Catatan
+                {savingNote ? "Menyimpan..." : "Simpan ke Catatan"}
               </PrimaryButton>
               <PrimaryButton
                 fullWidth

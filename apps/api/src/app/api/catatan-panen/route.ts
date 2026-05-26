@@ -1,6 +1,10 @@
 import { requireAuthenticatedUser } from '@/lib/auth'
-import { getGeminiModel } from '@/lib/gemini'
 import { badRequest, handleRouteError } from '@/lib/http'
+import {
+  generateHarvestSummary,
+  HARVEST_NOTE_SELECT,
+  sanitizeHarvestNotePayload,
+} from '@/lib/harvest-notes'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -45,42 +49,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate ringkasan AI kalau data panen sudah lengkap
-    let ringkasan_ai = null
-    if (hasil_aktual_kg != null && harga_jual != null) {
-      const total_pendapatan = hasil_aktual_kg * harga_jual
-      const prompt = `
-        Petani menanam ${jenis_tanaman}.
-        Tanggal tanam: ${tanggal_tanam}
-        Tanggal panen: ${tanggal_panen_aktual || estimasi_panen}
-        Hasil panen: ${hasil_aktual_kg} kg
-        Harga jual: Rp${harga_jual}/kg
-        Total pendapatan: Rp${total_pendapatan}
-        Masalah yang dialami: ${masalah || 'tidak ada'}
-
-        Buat ringkasan singkat 2-3 kalimat dalam bahasa Indonesia yang sederhana.
-        Sertakan apakah musim ini berhasil atau tidak dan saran untuk musim berikutnya.
-      `
-      const result = await getGeminiModel().generateContent(prompt)
-      ringkasan_ai = result.response.text().trim()
-    }
+    const payload = sanitizeHarvestNotePayload({
+      kalkulator_id,
+      jenis_tanaman,
+      tanggal_tanam,
+      estimasi_panen,
+      tanggal_panen_aktual,
+      hasil_aktual_kg,
+      harga_jual,
+      masalah,
+    })
+    const ringkasan_ai = await generateHarvestSummary(payload)
 
     const { data, error } = await supabaseAdmin
       .from('catatan_panen')
       .insert({
         user_id: user.id,
-        kalkulator_id: kalkulator_id || null,
-        jenis_tanaman,
-        tanggal_tanam,
-        estimasi_panen: estimasi_panen || null,
-        tanggal_panen_aktual: tanggal_panen_aktual || null,
-        hasil_aktual_kg: hasil_aktual_kg || null,
-        harga_jual: harga_jual || null,
-        masalah: masalah || null,
+        ...payload,
         ringkasan_ai,
         synced: true
       })
-      .select()
+      .select(HARVEST_NOTE_SELECT)
       .single()
 
     if (error) throw error
@@ -99,7 +88,7 @@ export async function GET(request: NextRequest) {
     const supabaseAdmin = getSupabaseAdmin()
     const { data, error } = await supabaseAdmin
       .from('catatan_panen')
-      .select('*, kalkulator_usaha(*)')
+      .select(HARVEST_NOTE_SELECT)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 

@@ -68,6 +68,19 @@ export type HarvestNoteRecord = {
   updated_at?: string;
 };
 
+export type CreateHarvestNotePayload = {
+  kalkulator_id?: string | null;
+  jenis_tanaman: string;
+  tanggal_tanam: string;
+  estimasi_panen?: string | null;
+  tanggal_panen_aktual?: string | null;
+  hasil_aktual_kg?: number | null;
+  harga_jual?: number | null;
+  masalah?: string | null;
+};
+
+export type UpdateHarvestNotePayload = Partial<CreateHarvestNotePayload>;
+
 export type WeatherForecastItem = {
   dt: number;
   dt_txt: string;
@@ -207,6 +220,38 @@ export async function listCalculators() {
 export async function listHarvestNotes() {
   const response = await apiRequest<{ status: string; data: HarvestNoteRecord[] }>(
     "/api/catatan-panen",
+  );
+
+  return response.data;
+}
+
+export async function createHarvestNote(payload: CreateHarvestNotePayload) {
+  const response = await apiRequest<{ status: string; data: HarvestNoteRecord }>(
+    "/api/catatan-panen",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+
+  return response.data;
+}
+
+export async function getHarvestNote(noteId: string) {
+  const response = await apiRequest<{ status: string; data: HarvestNoteRecord }>(
+    `/api/catatan-panen/${encodeURIComponent(noteId)}`,
+  );
+
+  return response.data;
+}
+
+export async function updateHarvestNote(noteId: string, payload: UpdateHarvestNotePayload) {
+  const response = await apiRequest<{ status: string; data: HarvestNoteRecord }>(
+    `/api/catatan-panen/${encodeURIComponent(noteId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
   );
 
   return response.data;

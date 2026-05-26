@@ -9,6 +9,8 @@ export const AppRoutes = {
   plantingGuide: "/planting-guide",
   weather: "/weather",
   notes: "/notes",
+  noteDetail: (noteId: string) => `/notes/${noteId}`,
+  noteEdit: (noteId: string) => `/notes/${noteId}/edit`,
   profile: "/profile",
   profilePersonalInfo: "/profile/personal-info",
   profileNotifications: "/profile/notifications",

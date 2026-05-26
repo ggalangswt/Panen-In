@@ -7,6 +7,16 @@ import { NextRequest, NextResponse } from 'next/server'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+function normalizeMetodeInput(value: unknown) {
+  const normalized = String(value || '').trim().toLowerCase()
+
+  if (normalized === 'teks') {
+    return 'teks'
+  }
+
+  return 'teks'
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuthenticatedUser(request)
@@ -47,7 +57,7 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: user.id,
         jenis_tanaman,
-        metode_input: metode_input || 'teks',
+        metode_input: normalizeMetodeInput(metode_input),
         pertanyaan,
         hasil_ai
       })

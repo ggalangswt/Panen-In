@@ -6,6 +6,8 @@ import type {
   WeatherForecastItem,
 } from "@/services/panenin-api";
 
+export type HarvestNoteStatus = "draft" | "active" | "completed";
+
 export function formatCurrency(value: number) {
   return `Rp ${new Intl.NumberFormat("id-ID").format(Math.round(value))}`;
 }
@@ -93,6 +95,55 @@ export function getRelatedCalculator(note: HarvestNoteRecord) {
   }
 
   return note.kalkulator_usaha ?? null;
+}
+
+export function getHarvestNoteStatus(note: HarvestNoteRecord): HarvestNoteStatus {
+  if (
+    note.tanggal_panen_aktual &&
+    note.hasil_aktual_kg != null &&
+    note.harga_jual != null
+  ) {
+    return "completed";
+  }
+
+  if (
+    note.estimasi_panen ||
+    note.tanggal_panen_aktual ||
+    note.hasil_aktual_kg != null ||
+    note.harga_jual != null
+  ) {
+    return "active";
+  }
+
+  return "draft";
+}
+
+export function getHarvestNoteStatusLabel(status: HarvestNoteStatus) {
+  if (status === "completed") {
+    return "Selesai";
+  }
+
+  if (status === "active") {
+    return "Dalam Proses";
+  }
+
+  return "Draft";
+}
+
+export function getHarvestNoteSummary(note: HarvestNoteRecord) {
+  if (note.ringkasan_ai?.trim()) {
+    return note.ringkasan_ai.trim();
+  }
+
+  if (note.masalah?.trim()) {
+    return note.masalah.trim();
+  }
+
+  if (note.kalkulator_id) {
+    return `Draft catatan ${note.jenis_tanaman} dari hasil kalkulator usaha tani.`;
+  }
+
+  return `Draft catatan ${note.jenis_tanaman} siap dilengkapi dengan hasil panen dan evaluasi musim.`;
 }
 
 export function getWeatherMetrics(item: WeatherForecastItem) {

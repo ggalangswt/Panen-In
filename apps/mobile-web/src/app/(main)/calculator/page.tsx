@@ -15,6 +15,7 @@ import { CalculationHeroCard } from "@/features/calculator/components/Calculatio
 import { ExpenseBreakdownCard } from "@/features/calculator/components/ExpenseBreakdownCard";
 import {
   createCalculator,
+  createHarvestNote,
   type CalculatorRecord,
 } from "@/services/panenin-api";
 import {
@@ -34,6 +35,10 @@ function parseNumberInput(value: string) {
   return Number(value.replace(/\D/g, "")) || 0;
 }
 
+function getTodayDateString() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function CalculatorPage() {
   const router = useRouter();
   const [selectedPlant, setSelectedPlant] = useState<PlantId>("padi");
@@ -49,6 +54,7 @@ export default function CalculatorPage() {
   const [showResult, setShowResult] = useState(false);
   const [result, setResult] = useState<CalculatorRecord | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [savingNote, setSavingNote] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   const selectedPlantLabel =
@@ -117,6 +123,29 @@ export default function CalculatorPage() {
       );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSaveToNotes = async () => {
+    if (!result) return;
+
+    setSavingNote(true);
+    setErrorMessage("");
+
+    try {
+      const note = await createHarvestNote({
+        kalkulator_id: result.id,
+        jenis_tanaman: selectedPlantLabel,
+        tanggal_tanam: getTodayDateString(),
+      });
+
+      router.push(AppRoutes.noteDetail(note.id));
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal menyimpan hasil kalkulator ke catatan.",
+      );
+    } finally {
+      setSavingNote(false);
     }
   };
 
@@ -269,6 +298,10 @@ export default function CalculatorPage() {
                 ]}
               />
             </div>
+
+            {errorMessage ? (
+              <p className="text-[12px] leading-[18px] text-[#b82c2c]">{errorMessage}</p>
+            ) : null}
           </div>
 
           <StickyActionBar>
@@ -277,9 +310,10 @@ export default function CalculatorPage() {
                 fullWidth
                 variant="light"
                 className="border border-[#c6dfc6] bg-[#ebf5eb] text-[15px] leading-[22.5px] text-[#2d6a2d]"
-                disabled
+                disabled={savingNote}
+                onClick={handleSaveToNotes}
               >
-                Simpan ke Catatan
+                {savingNote ? "Menyimpan..." : "Simpan ke Catatan"}
               </PrimaryButton>
               <PrimaryButton
                 fullWidth

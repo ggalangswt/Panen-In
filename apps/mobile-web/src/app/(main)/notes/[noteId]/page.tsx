@@ -10,8 +10,8 @@ import { SectionTitle } from "@/components/ui/SectionTitle";
 import { AppRoutes } from "@/constants/routes";
 import { ActivityTimeline } from "@/features/notes/components/ActivityTimeline";
 import {
+  getHarvestNote,
   getHarvestTimeline,
-  listHarvestNotes,
   type HarvestNoteRecord,
   type HarvestTimelineResponse,
 } from "@/services/panenin-api";
@@ -19,7 +19,10 @@ import {
   formatCompactCurrency,
   formatDateLabel,
   getCalculatorMetrics,
+  getHarvestNoteStatus,
+  getHarvestNoteStatusLabel,
   getRelatedCalculator,
+  getHarvestNoteSummary,
 } from "@/services/display";
 
 export default function NoteDetailPage() {
@@ -34,14 +37,14 @@ export default function NoteDetailPage() {
 
     async function loadNoteDetail() {
       try {
-        const [notes, timelineResponse] = await Promise.all([
-          listHarvestNotes(),
+        const [noteResponse, timelineResponse] = await Promise.all([
+          getHarvestNote(params.noteId),
           getHarvestTimeline(params.noteId),
         ]);
 
         if (cancelled) return;
 
-        setNote(notes.find((item) => item.id === params.noteId) ?? null);
+        setNote(noteResponse);
         setTimeline(timelineResponse.timeline);
       } catch (error) {
         if (!cancelled) {
@@ -63,6 +66,9 @@ export default function NoteDetailPage() {
     () => getCalculatorMetrics(note ? getRelatedCalculator(note) : null),
     [note],
   );
+  const statusLabel = note
+    ? getHarvestNoteStatusLabel(getHarvestNoteStatus(note))
+    : "Draft";
 
   return (
     <main className="min-h-screen bg-[#f7f7f5]">
@@ -70,6 +76,52 @@ export default function NoteDetailPage() {
 
       <section className="mx-auto flex min-h-[calc(100vh-68px)] w-full max-w-[393px] flex-col">
         <div className="flex flex-1 flex-col gap-[15px] px-3 pb-6 pt-[15px]">
+          {note ? (
+            <article className="rounded-[10px] border border-[#e0e0de] bg-white p-[15px]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="text-[18px] font-bold leading-[27px] text-[#1a1a18]">
+                    {note.jenis_tanaman}
+                  </p>
+                  <p className="text-[14px] leading-[21px] text-[#6b6b68]">
+                    {getHarvestNoteSummary(note)}
+                  </p>
+                </div>
+                <span className="rounded-full border border-[#c6dfc6] bg-[#ebf5eb] px-[10px] py-1 text-[14px] font-medium leading-[21px] text-[#2d6a2d]">
+                  {statusLabel}
+                </span>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-[10px]">
+                <div className="rounded-[10px] bg-[#f7f7f5] px-3 py-[10px]">
+                  <p className="text-[12px] font-medium leading-[18px] text-[#6b6b68]">
+                    Tanggal Tanam
+                  </p>
+                  <p className="text-[14px] font-medium leading-[21px] text-[#1a1a18]">
+                    {formatDateLabel(note.tanggal_tanam)}
+                  </p>
+                </div>
+                <div className="rounded-[10px] bg-[#f7f7f5] px-3 py-[10px]">
+                  <p className="text-[12px] font-medium leading-[18px] text-[#6b6b68]">
+                    Estimasi Panen
+                  </p>
+                  <p className="text-[14px] font-medium leading-[21px] text-[#1a1a18]">
+                    {note.estimasi_panen ? formatDateLabel(note.estimasi_panen) : "-"}
+                  </p>
+                </div>
+              </div>
+
+              {note.masalah ? (
+                <div className="mt-4 rounded-[10px] bg-[#fff8e5] px-3 py-[10px]">
+                  <p className="text-[12px] font-medium leading-[18px] text-[#6b6b68]">
+                    Catatan Masalah
+                  </p>
+                  <p className="text-[14px] leading-[21px] text-[#1a1a18]">{note.masalah}</p>
+                </div>
+              ) : null}
+            </article>
+          ) : null}
+
           <article className="rounded-[10px] border border-[#c6dfc6] bg-[#ebf5eb] p-[15px]">
             <p className="text-[14px] font-bold leading-[21px] text-[#2d6a2d]">
               RINGKASAN KEUANGAN
@@ -123,9 +175,19 @@ export default function NoteDetailPage() {
         </div>
 
         <StickyActionBar>
-          <PrimaryButton fullWidth onClick={() => router.push(AppRoutes.consultation)}>
-            Konsultasi AI
-          </PrimaryButton>
+          <div className="grid grid-cols-2 gap-[10px]">
+            <PrimaryButton
+              fullWidth
+              variant="light"
+              className="border border-[#c6dfc6] bg-[#ebf5eb] text-[15px] leading-[22.5px] text-[#2d6a2d]"
+              onClick={() => router.push(AppRoutes.noteEdit(params.noteId))}
+            >
+              Edit Catatan
+            </PrimaryButton>
+            <PrimaryButton fullWidth onClick={() => router.push(AppRoutes.consultation)}>
+              Konsultasi AI
+            </PrimaryButton>
+          </div>
         </StickyActionBar>
       </section>
     </main>

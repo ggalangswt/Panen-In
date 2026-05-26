@@ -13,17 +13,10 @@ import {
 } from "@/services/panenin-api";
 import {
   formatCompactCurrency,
-  getCalculatorMetrics,
-  getRelatedCalculator,
+  getHarvestNoteStatus,
+  getHarvestNoteStatusLabel,
+  getHarvestNoteSummary,
 } from "@/services/display";
-
-function buildSummary(note: HarvestNoteRecord) {
-  const calculator = getRelatedCalculator(note);
-  const metrics = getCalculatorMetrics(calculator);
-  const yieldLabel = note.hasil_aktual_kg ? ` - ${note.hasil_aktual_kg} kg hasil panen` : "";
-
-  return `${formatCompactCurrency(metrics.profit)} keuntungan${yieldLabel}`;
-}
 
 export default function NotesPage() {
   const [notes, setNotes] = useState<HarvestNoteRecord[]>([]);
@@ -80,8 +73,7 @@ export default function NotesPage() {
             ) : null}
             {notes.length > 0 ? (
               notes.map((note) => {
-                const calculator = getRelatedCalculator(note);
-                const metrics = getCalculatorMetrics(calculator);
+                const status = getHarvestNoteStatus(note);
 
                 return (
                   <HarvestNoteCard
@@ -89,10 +81,8 @@ export default function NotesPage() {
                     href={`/notes/${note.id}`}
                     emoji="🌾"
                     plant={note.jenis_tanaman}
-                    status={
-                      metrics.profit > 0 ? "Untung" : metrics.profit < 0 ? "Rugi" : "Netral"
-                    }
-                    summary={note.ringkasan_ai || buildSummary(note)}
+                    status={getHarvestNoteStatusLabel(status)}
+                    summary={getHarvestNoteSummary(note)}
                   />
                 );
               })
