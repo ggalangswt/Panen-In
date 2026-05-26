@@ -15,10 +15,12 @@ import {
   getMyProfile,
   getNotificationSettings,
   listCalculators,
+  registerNotificationToken,
   updateNotificationSettings,
   type NotificationSettings,
   type Profile,
 } from "@/services/panenin-api";
+import { requestPushNotificationToken } from "@/services/push-notifications";
 import { formatCompactCurrency, getCalculatorMetrics } from "@/services/display";
 
 function BellIcon() {
@@ -44,6 +46,12 @@ export default function ProfilePage() {
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
   const [offlineEnabled, setOfflineEnabled] = useState(false);
   const [totalProfit, setTotalProfit] = useState(0);
+  const [notificationMessage, setNotificationMessage] = useState("");
+
+  const browserTimezone =
+    typeof window !== "undefined"
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Jakarta"
+      : "Asia/Jakarta";
 
   useEffect(() => {
     let cancelled = false;
@@ -87,18 +95,41 @@ export default function ProfilePage() {
   );
 
   const handleNotificationsToggle = async (checked: boolean) => {
+    setNotificationMessage("");
     setSettings((current) =>
       current ? { ...current, notifications_enabled: checked } : current,
     );
 
     try {
+      if (checked) {
+        const token = await requestPushNotificationToken();
+
+        await registerNotificationToken({
+          token,
+          device_type: "web",
+        });
+      }
+
       const nextSettings = await updateNotificationSettings({
         notifications_enabled: checked,
+        timezone: browserTimezone,
       });
       setSettings(nextSettings);
-    } catch {
+      setNotificationMessage(
+        checked
+          ? "Notifikasi browser berhasil diaktifkan."
+          : "Notifikasi browser dinonaktifkan.",
+      );
+    } catch (error) {
       setSettings((current) =>
         current ? { ...current, notifications_enabled: !checked } : current,
+      );
+      setNotificationMessage(
+        error instanceof Error
+          ? error.message
+          : checked
+            ? "Izin atau registrasi notifikasi browser gagal."
+            : "Gagal memperbarui pengaturan notifikasi.",
       );
     }
   };
@@ -215,6 +246,11 @@ export default function ProfilePage() {
                 }
               />
             </div>
+            {notificationMessage ? (
+              <p className="pt-2 text-[12px] leading-[18px] text-[#6b6b68]">
+                {notificationMessage}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-0">

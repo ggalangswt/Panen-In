@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from('fcm_tokens')
       .upsert(
-        { user_id: user.id, token, device_type: device_type || 'web' },
+        { user_id: user.id, token, device_type: String(device_type || 'web').trim() || 'web' },
         { onConflict: 'token' }
       )
       .select()

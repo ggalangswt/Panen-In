@@ -1,19 +1,18 @@
 import * as admin from 'firebase-admin'
+import {
+  getFirebaseClientEmail,
+  getFirebasePrivateKey,
+  getFirebaseProjectId,
+} from '@/lib/env'
 
 function getFirebaseApp() {
   if (admin.apps.length) {
     return admin.app()
   }
 
-  const projectId = process.env.FIREBASE_PROJECT_ID
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error(
-      'Missing Firebase Admin credentials: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are required',
-    )
-  }
+  const projectId = getFirebaseProjectId()
+  const clientEmail = getFirebaseClientEmail()
+  const privateKey = getFirebasePrivateKey().replace(/\\n/g, '\n')
 
   return admin.initializeApp({
     credential: admin.credential.cert({

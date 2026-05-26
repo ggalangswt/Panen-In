@@ -17,10 +17,21 @@ Repo ini saat ini mengandalkan environment variable berikut:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_API_URL`
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `NEXT_PUBLIC_FIREBASE_VAPID_KEY`
 - `SUPABASE_SECRET_KEY`
 - `GEMINI_API_KEY`
 - `OPENWEATHER_API_KEY`
 - `NOTIFICATION_CRON_SECRET`
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_CLIENT_EMAIL`
+- `FIREBASE_PRIVATE_KEY`
 
 Catatan lokal: file `.env` di root repo tidak otomatis dibaca saat kamu menjalankan `apps/api` atau `apps/mobile-web` secara langsung dari workspace app. Cara paling aman adalah source env dulu dari root repo sebelum menjalankan app:
 
@@ -75,3 +86,33 @@ Setelah migration diterapkan, endpoint baru yang dipakai frontend adalah:
 - Semua route user-facing sekarang wajib bearer token Supabase.
 - Area `(main)` di frontend sudah protected; user tanpa session akan diarahkan ke `/login`.
 - Route internal `POST /api/notifikasi/send` sekarang butuh header `x-internal-secret` yang nilainya sama dengan `NOTIFICATION_CRON_SECRET`.
+
+## Push Notification Live
+
+Scope live saat ini baru `cuaca pagi`.
+
+Yang sudah diimplementasikan:
+
+- frontend web meminta permission browser saat toggle notifikasi utama diaktifkan
+- frontend mendaftarkan FCM token ke `POST /api/notifikasi/register`
+- backend scheduler hanya memilih user dengan `notifications_enabled = true` dan `weather_morning = true`
+- backend hanya mengirim saat `morning_hour` cocok dengan jam lokal user
+- backend mendedupe `cuaca_pagi` agar tidak terkirim dua kali di hari lokal yang sama
+- backend membersihkan token FCM yang invalid
+
+Yang masih perlu kamu set manual di deploy:
+
+1. Isi env Firebase Web di frontend Vercel.
+2. Isi env Firebase Admin di backend Railway.
+3. Buat Railway Cron yang memanggil:
+
+```http
+POST /api/notifikasi/send
+x-internal-secret: <NOTIFICATION_CRON_SECRET>
+```
+
+Jadwal yang disarankan:
+
+- `0 * * * *`
+
+Artinya cron jalan tiap jam, lalu backend sendiri yang memfilter user sesuai timezone dan `morning_hour`.

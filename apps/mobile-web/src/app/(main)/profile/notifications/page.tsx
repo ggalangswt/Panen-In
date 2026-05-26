@@ -36,6 +36,10 @@ function toFormState(settings: NotificationSettings): NotificationFormState {
   };
 }
 
+function getBrowserTimezone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Jakarta";
+}
+
 export default function ProfileNotificationsPage() {
   const router = useRouter();
   const [settings, setSettings] = useState<NotificationFormState>({
@@ -92,6 +96,7 @@ export default function ProfileNotificationsPage() {
         harvest_reminder: settings.harvestReminder,
         weekly_ai_tips: settings.weeklyAiTips,
         morning_hour: morningHour,
+        timezone: getBrowserTimezone(),
       });
 
       setMessage("Pengaturan notifikasi berhasil disimpan.");

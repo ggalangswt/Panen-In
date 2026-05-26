@@ -1,11 +1,48 @@
-import { getMessaging } from '@/lib/firebase'
 import { getNotificationCronSecret } from '@/lib/env'
+import { getMessaging } from '@/lib/firebase'
 import { forbidden, handleRouteError } from '@/lib/http'
+import {
+  hasSentWeatherMorningToday,
+  shouldSendWeatherMorningNow,
+  type NotificationLogRow,
+  type NotificationSettingsRow,
+} from '@/lib/notifications'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+type TokenRow = {
+  id: number
+  user_id: string
+  token: string
+  device_type: string | null
+}
+
+const WEATHER_MORNING_TYPE = 'cuaca_pagi'
+const WEATHER_MORNING_TITLE = 'Sugeng Enjang, Pak Tani! 🌾'
+const WEATHER_MORNING_BODY =
+  'Yuk cek rekomendasi cuaca dan jadwal perawatan komoditasmu hari ini di PanenIn.'
+
+function buildWeatherMorningMessage(tokens: string[]) {
+  return {
+    notification: {
+      title: WEATHER_MORNING_TITLE,
+      body: WEATHER_MORNING_BODY,
+    },
+    data: {
+      type: WEATHER_MORNING_TYPE,
+      path: '/weather',
+    },
+    webpush: {
+      fcmOptions: {
+        link: '/weather',
+      },
+    },
+    tokens,
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,79 +52,151 @@ export async function POST(request: NextRequest) {
       return forbidden('Invalid internal secret')
     }
 
-    // 1. Ambil token SEKALIGUS user_id dari database
     const supabaseAdmin = getSupabaseAdmin()
-    const { data: tokens, error: dbError } = await supabaseAdmin
+    const now = new Date()
+
+    const { data: tokenRows, error: tokenError } = await supabaseAdmin
       .from('fcm_tokens')
-      .select('user_id, token')
+      .select('id, user_id, token, device_type')
 
-    if (dbError) throw dbError
-
-    if (!tokens || tokens.length === 0) {
-      return NextResponse.json({ status: 'skipped', message: 'Tidak ada token aktif di database' })
+    if (tokenError) {
+      throw tokenError
     }
 
-    const userIds = [...new Set(tokens?.map((entry: any) => entry.user_id) ?? [])]
+    const tokens = (tokenRows ?? []) as TokenRow[]
+
+    if (tokens.length === 0) {
+      return NextResponse.json({
+        status: 'skipped',
+        summary: {
+          total_tokens: 0,
+          eligible_tokens: 0,
+          sent: 0,
+          failed: 0,
+          removed_invalid_tokens: 0,
+          skipped_users: 0,
+        },
+      })
+    }
+
+    const userIds = [...new Set(tokens.map((entry) => entry.user_id))]
     const { data: settingsRows, error: settingsError } = await supabaseAdmin
       .from('notification_settings')
-      .select('user_id, notifications_enabled, weather_morning')
+      .select('user_id, notifications_enabled, weather_morning, morning_hour, timezone')
       .in('user_id', userIds)
 
-    if (settingsError) throw settingsError
+    if (settingsError) {
+      throw settingsError
+    }
 
-    const settingsByUserId = new Map<string, any>(
-      (settingsRows ?? []).map((row: any) => [row.user_id, row]),
+    const { data: logRows, error: logsError } = await supabaseAdmin
+      .from('notifikasi_log')
+      .select('user_id, sent_at')
+      .eq('tipe', WEATHER_MORNING_TYPE)
+      .gte('sent_at', new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString())
+
+    if (logsError) {
+      throw logsError
+    }
+
+    const settingsByUserId = new Map<string, NotificationSettingsRow>(
+      (settingsRows ?? []).map((row: NotificationSettingsRow) => [row.user_id, row]),
+    )
+    const logs = (logRows ?? []) as NotificationLogRow[]
+    const eligibleTokens: TokenRow[] = []
+    let skippedUsers = 0
+
+    for (const userId of userIds) {
+      const settings = settingsByUserId.get(userId)
+
+      if (!settings || !shouldSendWeatherMorningNow(settings, now)) {
+        skippedUsers += 1
+        continue
+      }
+
+      if (hasSentWeatherMorningToday(userId, settings, logs, now)) {
+        skippedUsers += 1
+        continue
+      }
+
+      eligibleTokens.push(...tokens.filter((entry: TokenRow) => entry.user_id === userId))
+    }
+
+    if (eligibleTokens.length === 0) {
+      return NextResponse.json({
+        status: 'skipped',
+        summary: {
+          total_tokens: tokens.length,
+          eligible_tokens: 0,
+          sent: 0,
+          failed: 0,
+          removed_invalid_tokens: 0,
+          skipped_users: skippedUsers,
+        },
+      })
+    }
+
+    const response = await getMessaging().sendEachForMulticast(
+      buildWeatherMorningMessage(eligibleTokens.map((entry) => entry.token)),
     )
 
-    const activeTokens =
-      tokens?.filter((entry: any) => {
-        const settings = settingsByUserId.get(entry.user_id)
+    const invalidTokenIds: number[] = []
+    let sentCount = 0
+    const successfulUserIds = new Set<string>()
 
-        return settings
-          ? settings.notifications_enabled && settings.weather_morning
-          : true
-      }) ?? []
+    response.responses.forEach((entry, index) => {
+      const tokenRow = eligibleTokens[index]
 
-    if (activeTokens.length === 0) {
-      return NextResponse.json({ status: 'skipped', message: 'Tidak ada token aktif di database' })
+      if (entry.success) {
+        sentCount += 1
+        successfulUserIds.add(tokenRow.user_id)
+        return
+      }
+
+      const errorCode = entry.error?.code || ''
+      if (
+        errorCode.includes('registration-token-not-registered') ||
+        errorCode.includes('invalid-registration-token')
+      ) {
+        invalidTokenIds.push(tokenRow.id)
+      }
+    })
+
+    if (invalidTokenIds.length > 0) {
+      const { error: deleteError } = await supabaseAdmin
+        .from('fcm_tokens')
+        .delete()
+        .in('id', invalidTokenIds)
+
+      if (deleteError) {
+        console.error('Gagal menghapus token FCM invalid:', deleteError.message)
+      }
     }
 
-    const tokenList = activeTokens.map((t: any) => t.token)
-    const pesanNotifikasi = 'Sugeng Enjang, Pak Tani! 🌾 Yuk cek rekomendasi cuaca dan jadwal perawatan komoditasmu hari ini di PanenIn.'
+    if (successfulUserIds.size > 0) {
+      const { error: logInsertError } = await supabaseAdmin.from('notifikasi_log').insert(
+        [...successfulUserIds].map((userId) => ({
+          user_id: userId,
+          tipe: WEATHER_MORNING_TYPE,
+          pesan: WEATHER_MORNING_BODY,
+          sent_at: now.toISOString(),
+        })),
+      )
 
-    // 2. Rancang template pesan harian untuk Firebase
-    const message = {
-      notification: {
-        title: 'Sugeng Enjang, Pak Tani! 🌾',
-        body: 'Yuk cek rekomendasi cuaca dan jadwal perawatan komoditasmu hari ini di PanenIn.',
-      },
-      tokens: tokenList,
+      if (logInsertError) {
+        console.error('Gagal menyimpan log notifikasi:', logInsertError.message)
+      }
     }
-
-    // 3. Kirim massal lewat Firebase Admin SDK
-    const response = await getMessaging().sendEachForMulticast(message)
-    
-    // 4. Sesuaikan dengan tabel kamu: buat array log untuk di-insert masal
-    const logs = activeTokens.map((t: any) => ({
-      user_id: t.user_id,
-      tipe: 'cuaca_pagi', // Mengisi kolom 'tipe'
-      pesan: pesanNotifikasi,    // Mengisi kolom 'pesan'
-      sent_at: new Date().toISOString()
-    }))
-
-    // Insert semua log ke tabel notifikasi_log kamu
-    const { error: logError } = await supabaseAdmin
-      .from('notifikasi_log')
-      .insert(logs)
-
-    if (logError) console.error('⚠️ Gagal menyimpan log notifikasi:', logError.message)
 
     return NextResponse.json({
       status: 'success',
       summary: {
-        total: tokenList.length,
-        success: response.successCount,
+        total_tokens: tokens.length,
+        eligible_tokens: eligibleTokens.length,
+        sent: sentCount,
         failed: response.failureCount,
+        removed_invalid_tokens: invalidTokenIds.length,
+        skipped_users: skippedUsers,
       },
     })
   } catch (error) {

@@ -31,3 +31,15 @@ export function getOpenWeatherApiKey() {
 export function getNotificationCronSecret() {
   return requireEnv('NOTIFICATION_CRON_SECRET')
 }
+
+export function getFirebaseProjectId() {
+  return requireEnv('FIREBASE_PROJECT_ID')
+}
+
+export function getFirebaseClientEmail() {
+  return requireEnv('FIREBASE_CLIENT_EMAIL')
+}
+
+export function getFirebasePrivateKey() {
+  return requireEnv('FIREBASE_PRIVATE_KEY')
+}

@@ -169,6 +169,19 @@ export async function updateNotificationSettings(
   return payload.data;
 }
 
+export async function registerNotificationToken(payload: {
+  token: string;
+  device_type?: string;
+}) {
+  return apiRequest<{ status: string; message: string; data: unknown }>(
+    "/api/notifikasi/register",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
 export async function getWeather(kabupaten: string) {
   return apiRequest<WeatherApiResponse>(
     `/api/cuaca?kabupaten=${encodeURIComponent(kabupaten)}`,
