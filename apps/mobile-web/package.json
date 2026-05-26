@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node ./scripts/run-next.mjs dev .next-dev",
     "build": "node ./scripts/run-next.mjs build .next-build",
+    "build:vercel": "next build",
     "start": "node ./scripts/run-next.mjs start .next-build",
     "lint": "next lint",
     "typecheck": "tsc --project tsconfig.json --noEmit",
