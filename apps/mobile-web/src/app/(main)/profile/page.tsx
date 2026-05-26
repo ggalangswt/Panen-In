@@ -1,16 +1,25 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
+import { useAuth } from "@/components/providers/AuthProvider";
 import { plantOptions } from "@/constants/plants";
 import { AppRoutes } from "@/constants/routes";
 import { ProfileMenuRow } from "@/features/profile/components/ProfileMenuRow";
+import {
+  getMyProfile,
+  getNotificationSettings,
+  listCalculators,
+  updateNotificationSettings,
+  type NotificationSettings,
+  type Profile,
+} from "@/services/panenin-api";
+import { formatCompactCurrency, getCalculatorMetrics } from "@/services/display";
 
 function BellIcon() {
   return <AppIcon src="/icons/notif.svg" alt="Ikon notifikasi" size={20} />;
@@ -30,12 +39,74 @@ function ShieldIcon() {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const { signOut } = useAuth();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [settings, setSettings] = useState<NotificationSettings | null>(null);
   const [offlineEnabled, setOfflineEnabled] = useState(false);
+  const [totalProfit, setTotalProfit] = useState(0);
 
-  const userPlants = plantOptions.filter((plant) =>
-    ["padi", "jagung"].includes(plant.id),
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProfile() {
+      try {
+        const [nextProfile, nextSettings, calculators] = await Promise.all([
+          getMyProfile(),
+          getNotificationSettings(),
+          listCalculators().catch(() => []),
+        ]);
+
+        if (cancelled) return;
+
+        setProfile(nextProfile);
+        setSettings(nextSettings);
+        setTotalProfit(
+          calculators.reduce((sum, item) => sum + getCalculatorMetrics(item).profit, 0),
+        );
+      } catch {
+        if (!cancelled) {
+          setProfile(null);
+        }
+      }
+    }
+
+    void loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const userPlants = useMemo(
+    () =>
+      plantOptions.filter((plant) =>
+        profile?.preferred_plants.includes(plant.id) ||
+        profile?.preferred_plants.includes(plant.label),
+      ),
+    [profile?.preferred_plants],
   );
+
+  const handleNotificationsToggle = async (checked: boolean) => {
+    setSettings((current) =>
+      current ? { ...current, notifications_enabled: checked } : current,
+    );
+
+    try {
+      const nextSettings = await updateNotificationSettings({
+        notifications_enabled: checked,
+      });
+      setSettings(nextSettings);
+    } catch {
+      setSettings((current) =>
+        current ? { ...current, notifications_enabled: !checked } : current,
+      );
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    router.replace(AppRoutes.login);
+  };
 
   return (
     <main className="min-h-screen bg-[#f7f7f5]">
@@ -44,15 +115,17 @@ export default function ProfilePage() {
           <div className="flex h-[163px] flex-col items-center justify-center gap-2">
             <Image
               src="/profile.jpg"
-              alt="Foto profil Suparman"
+              alt="Foto profil pengguna"
               width={80}
               height={80}
               className="size-20 rounded-full object-cover"
             />
             <div className="text-center">
-              <p className="text-[15px] font-medium leading-[22.5px] text-white">Suparman</p>
+              <p className="text-[15px] font-medium leading-[22.5px] text-white">
+                {profile?.display_name || profile?.email?.split("@")[0] || "Petani"}
+              </p>
               <p className="text-[12px] font-normal leading-[18px] text-[#e0e0de]">
-                Yogyakarta
+                {profile?.kabupaten || "Kabupaten belum diisi"}
               </p>
             </div>
           </div>
@@ -60,18 +133,30 @@ export default function ProfilePage() {
 
         <div className="border-b border-[#e0e0de] bg-white py-[15px] text-center">
           <p className="text-[12px] font-normal leading-[18px] text-[#6b6b68]">Total Untung</p>
-          <p className="text-[15px] font-medium leading-[22.5px] text-[#1a1a18]">Rp 2,6jt</p>
+          <p className="text-[15px] font-medium leading-[22.5px] text-[#1a1a18]">
+            {formatCompactCurrency(totalProfit)}
+          </p>
         </div>
 
         <div className="flex flex-1 flex-col gap-[15px] px-5 py-[15px]">
           <div className="flex flex-col gap-[10px]">
             <p className="text-[14px] font-bold leading-[21px] text-[#6b6b68]">TANAMAN KAMU</p>
             <div className="rounded-[10px] border border-[#e0e0de] bg-[#f7f7f5] px-5 py-[10px]">
-              <div className="flex items-center gap-2">
-                <span className="text-[25px] leading-none">{userPlants[0]?.emoji ?? "🌾"}</span>
-                <span className="text-[15px] font-medium leading-[22.5px] text-[#1a1a18]">
-                  {userPlants[0]?.label ?? "Padi"}
-                </span>
+              <div className="flex flex-wrap items-center gap-2">
+                {userPlants.length > 0 ? (
+                  userPlants.map((plant) => (
+                    <div key={plant.id} className="flex items-center gap-2">
+                      <span className="text-[25px] leading-none">{plant.emoji}</span>
+                      <span className="text-[15px] font-medium leading-[22.5px] text-[#1a1a18]">
+                        {plant.label}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <span className="text-[14px] leading-[21px] text-[#6b6b68]">
+                    Belum ada tanaman dipilih.
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -82,16 +167,16 @@ export default function ProfilePage() {
             </p>
             <div>
               <div
-                role={notificationsEnabled ? "button" : undefined}
-                tabIndex={notificationsEnabled ? 0 : -1}
+                role={settings?.notifications_enabled ? "button" : undefined}
+                tabIndex={settings?.notifications_enabled ? 0 : -1}
                 onClick={() => {
-                  if (notificationsEnabled) {
+                  if (settings?.notifications_enabled) {
                     router.push(AppRoutes.profileNotifications);
                   }
                 }}
                 onKeyDown={(event) => {
                   if (
-                    notificationsEnabled &&
+                    settings?.notifications_enabled &&
                     (event.key === "Enter" || event.key === " ")
                   ) {
                     event.preventDefault();
@@ -111,8 +196,8 @@ export default function ProfilePage() {
                   </div>
                   <div onClick={(event) => event.stopPropagation()}>
                     <ToggleSwitch
-                      checked={notificationsEnabled}
-                      onChange={setNotificationsEnabled}
+                      checked={settings?.notifications_enabled ?? true}
+                      onChange={handleNotificationsToggle}
                       ariaLabel="Aktifkan notifikasi"
                     />
                   </div>
@@ -151,10 +236,14 @@ export default function ProfilePage() {
           </div>
 
           <div className="mt-auto bg-white py-5 text-center">
-            <Link href={AppRoutes.login} className="inline-flex items-center gap-[10px] text-[15px] font-bold leading-[22.5px] text-[#b82c2c]">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center gap-[10px] text-[15px] font-bold leading-[22.5px] text-[#b82c2c]"
+            >
               <AppIcon src="/icons/logout.svg" alt="Ikon keluar" size={20} />
               <span>Keluar dari Akun</span>
-            </Link>
+            </button>
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { FeatureScreenHeader } from "@/components/layout/FeatureScreenHeader";
@@ -10,7 +10,6 @@ import { FeatureTextInput } from "@/components/ui/FeatureTextInput";
 import { PlantChipSelector } from "@/components/ui/PlantChipSelector";
 import { SectionTitle } from "@/components/ui/SectionTitle";
 import {
-  consultationMockResults,
   consultationSymptoms,
   plantOptions,
   type PlantId,
@@ -18,6 +17,7 @@ import {
 import { AppRoutes } from "@/constants/routes";
 import { ConsultationResultCard } from "@/features/consultation/components/ConsultationResultCard";
 import { ConsultationSymptomGrid } from "@/features/consultation/components/ConsultationSymptomGrid";
+import { createConsultation, type ConsultationAiResult } from "@/services/panenin-api";
 
 export default function ConsultationPage() {
   const router = useRouter();
@@ -25,14 +25,13 @@ export default function ConsultationPage() {
   const [selectedSymptom, setSelectedSymptom] = useState<string>("Daun menguning");
   const [customProblem, setCustomProblem] = useState("");
   const [showResult, setShowResult] = useState(false);
+  const [result, setResult] = useState<ConsultationAiResult | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const activeProblem = customProblem.trim() || selectedSymptom;
   const selectedPlantLabel =
     plantOptions.find((plant) => plant.id === selectedPlant)?.label ?? "Padi";
-  const result = useMemo(
-    () => consultationMockResults[selectedPlant],
-    [selectedPlant],
-  );
 
   const handleBack = () => {
     if (showResult) {
@@ -41,6 +40,28 @@ export default function ConsultationPage() {
     }
 
     router.push(AppRoutes.home);
+  };
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      const response = await createConsultation({
+        jenis_tanaman: selectedPlantLabel,
+        metode_input: customProblem.trim() ? "teks" : "preset",
+        pertanyaan: activeProblem,
+      });
+
+      setResult(response.hasil_ai);
+      setShowResult(true);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal mengirim konsultasi.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -84,11 +105,15 @@ export default function ConsultationPage() {
               value={customProblem}
               onChange={(event) => setCustomProblem(event.target.value)}
             />
+
+            {errorMessage ? (
+              <p className="text-[12px] leading-[18px] text-[#b82c2c]">{errorMessage}</p>
+            ) : null}
           </div>
 
           <StickyActionBar>
-            <PrimaryButton fullWidth onClick={() => setShowResult(true)}>
-              Konsultasikan
+            <PrimaryButton fullWidth disabled={submitting} onClick={handleSubmit}>
+              {submitting ? "Memproses..." : "Konsultasikan"}
             </PrimaryButton>
           </StickyActionBar>
         </section>
@@ -103,16 +128,16 @@ export default function ConsultationPage() {
 
             <ConsultationResultCard
               title="Kemungkinan Penyebab"
-              items={result.possibleCauses}
+              items={result?.penyebab ?? []}
             />
             <ConsultationResultCard
               title="Rekomendasi Tindakan"
-              items={result.recommendations}
+              items={result?.rekomendasi ?? []}
               accent
             />
             <ConsultationResultCard
               title="Tips Pencegahan"
-              items={result.preventionTips}
+              items={result?.pencegahan ?? []}
             />
           </div>
 
@@ -122,6 +147,7 @@ export default function ConsultationPage() {
                 fullWidth
                 variant="light"
                 className="border border-[#c6dfc6] bg-[#ebf5eb] text-[15px] leading-[22.5px] text-[#2d6a2d]"
+                disabled
               >
                 Simpan ke Catatan
               </PrimaryButton>

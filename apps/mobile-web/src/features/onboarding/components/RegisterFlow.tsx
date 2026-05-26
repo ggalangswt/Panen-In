@@ -2,15 +2,22 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AppRoutes } from "@/constants/routes";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { FeatureTextInput } from "@/components/ui/FeatureTextInput";
+import { useAuth } from "@/components/providers/AuthProvider";
 import { AuthInputField } from "@/features/onboarding/components/AuthInputField";
 import { OnboardingHero } from "@/features/onboarding/components/OnboardingHero";
 import { OnboardingHeader } from "@/features/onboarding/components/OnboardingHeader";
 import { OnboardingProgress } from "@/features/onboarding/components/OnboardingProgress";
 import { PlantSelector } from "@/features/onboarding/components/PlantSelector";
+import {
+  savePendingOnboardingDraft,
+  signUpWithEmailPassword,
+  syncPendingOnboardingDraft,
+} from "@/services/auth";
 
 const totalSteps = 4;
 const vineyardImage = "/login-hero.png";
@@ -18,17 +25,55 @@ const locationImage = "/register-location.png";
 
 export function RegisterFlow() {
   const router = useRouter();
+  const { loading, session } = useAuth();
   const [step, setStep] = useState(0);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [kabupaten, setKabupaten] = useState("");
   const [selectedPlants, setSelectedPlants] = useState<string[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const nextStep = () => setStep((current) => Math.min(current + 1, totalSteps - 1));
   const togglePlant = (id: string) => {
     setSelectedPlants((current) =>
       current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
     );
+  };
+
+  useEffect(() => {
+    if (!loading && session) {
+      router.replace(AppRoutes.home);
+    }
+  }, [loading, router, session]);
+
+  const handleComplete = async () => {
+    setSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      savePendingOnboardingDraft({
+        display_name: name.trim(),
+        kabupaten: kabupaten.trim(),
+        preferred_plants: selectedPlants,
+      });
+
+      const signUpResult = await signUpWithEmailPassword(email.trim(), password);
+
+      if (signUpResult.session) {
+        await syncPendingOnboardingDraft(signUpResult.session);
+        router.replace(AppRoutes.home);
+        return;
+      }
+
+      router.replace(`${AppRoutes.login}?registered=1`);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal membuat akun. Coba lagi.",
+      );
+      setSubmitting(false);
+    }
   };
 
   if (step === 3) {
@@ -66,10 +111,17 @@ export function RegisterFlow() {
                 <PrimaryButton
                   variant="solid"
                   fullWidth
-                  onClick={() => router.push(AppRoutes.home)}
+                  disabled={submitting}
+                  onClick={handleComplete}
                 >
-                  Selesai Masuk
+                  {submitting ? "Membuat akun..." : "Selesai Masuk"}
                 </PrimaryButton>
+
+                {errorMessage ? (
+                  <p className="text-center text-[12px] leading-[18px] text-[#b82c2c]">
+                    {errorMessage}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -145,7 +197,13 @@ export function RegisterFlow() {
           />
         </div>
       ),
-      fields: null,
+      fields: (
+        <FeatureTextInput
+          placeholder="Tulis kabupaten atau kota kamu"
+          value={kabupaten}
+          onChange={(event) => setKabupaten(event.target.value)}
+        />
+      ),
       footer: (
         <>
           <PrimaryButton variant="solid" fullWidth onClick={nextStep}>

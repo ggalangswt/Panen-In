@@ -1,5 +1,6 @@
 import { requireAuthenticatedUser } from '@/lib/auth'
 import { badRequest, handleRouteError } from '@/lib/http'
+import { ensureLegacyUserRow } from '@/lib/legacy-user'
 import { ensureProfile } from '@/lib/profile'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
@@ -80,6 +81,11 @@ export async function PATCH(request: NextRequest) {
     if (error) {
       throw error
     }
+
+    await ensureLegacyUserRow(user, {
+      nama: typeof updates.display_name === 'string' ? updates.display_name : undefined,
+      kabupaten: 'kabupaten' in updates ? (updates.kabupaten as string | null) : undefined,
+    })
 
     return NextResponse.json({
       status: 'success',

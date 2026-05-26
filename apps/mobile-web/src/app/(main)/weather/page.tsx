@@ -1,86 +1,81 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { WeatherAdviceCard } from "@/features/weather/components/WeatherAdviceCard";
 import { ForecastDayCard } from "@/features/weather/components/ForecastDayCard";
 import { WeatherOverviewCard } from "@/features/weather/components/WeatherOverviewCard";
 import { WeatherTopBar } from "@/features/weather/components/WeatherTopBar";
-
-const forecastDays = [
-  {
-    id: "today",
-    day: "Hari ini",
-    iconSrc: "/icons/berawan.png",
-    iconAlt: "Cuaca berawan",
-    temp: "28°C",
-    condition: "Berawan - Yogyakarta",
-    advice: [
-      "Waktu bagus untuk menyiram - lakukan pagi ini sebelum panas",
-      "Kelembaban tinggi — waspadai penyakit jamur seperti blas dan hawar daun",
-      "Tunda penyemprotan — diperkirakan hujan sore hari",
-    ],
-  },
-  {
-    id: "sat",
-    day: "Sab",
-    iconSrc: "/icons/cerah.svg",
-    iconAlt: "Cuaca cerah",
-    temp: "31°C",
-    condition: "Cerah - Yogyakarta",
-    advice: [
-      "Manfaatkan cuaca cerah untuk pengeringan hasil panen setelah pukul 09.00",
-      "Pantau kebutuhan air karena suhu naik lebih tinggi dari hari ini",
-      "Penyemprotan preventif lebih aman dilakukan pagi hari sebelum matahari terik",
-    ],
-  },
-  {
-    id: "sun",
-    day: "Min",
-    iconSrc: "/icons/hujan.svg",
-    iconAlt: "Cuaca hujan",
-    temp: "25°C",
-    condition: "Hujan - Yogyakarta",
-    advice: [
-      "Kurangi jadwal penyiraman karena tanah diperkirakan tetap lembap sepanjang hari",
-      "Cek saluran air agar tidak terjadi genangan di area tanam",
-      "Tunda aplikasi pupuk daun sampai hujan mereda agar tidak terbuang",
-    ],
-  },
-  {
-    id: "mon",
-    day: "Sen",
-    iconSrc: "/icons/berawan.png",
-    iconAlt: "Cuaca berawan",
-    temp: "29°C",
-    condition: "Berawan - Yogyakarta",
-    advice: [
-      "Cuaca cukup aman untuk inspeksi daun dan batang di pagi hari",
-      "Jaga sirkulasi udara area tanam untuk mengurangi risiko penyakit lembap",
-      "Bisa mulai persiapan penyemprotan jika prakiraan hujan tetap rendah",
-    ],
-  },
-  {
-    id: "tue",
-    day: "Sel",
-    iconSrc: "/icons/cerah.svg",
-    iconAlt: "Cuaca cerah",
-    temp: "32°C",
-    condition: "Cerah - Yogyakarta",
-    advice: [
-      "Naungan sementara bisa dipertimbangkan untuk bibit muda saat siang",
-      "Pastikan jadwal penyiraman maju lebih pagi agar penguapan tidak terlalu tinggi",
-      "Hindari pemupukan siang hari supaya akar tidak stres oleh panas",
-    ],
-  },
-] as const;
+import {
+  getMyProfile,
+  getWeather,
+  type Profile,
+  type WeatherApiResponse,
+  type WeatherForecastItem,
+} from "@/services/panenin-api";
+import {
+  formatForecastDay,
+  getWeatherIconSrc,
+  getWeatherMetrics,
+} from "@/services/display";
 
 export default function WeatherPage() {
-  const [selectedDayId, setSelectedDayId] = useState<(typeof forecastDays)[number]["id"]>("today");
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [weatherResponse, setWeatherResponse] = useState<WeatherApiResponse | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const selectedDay = useMemo(
-    () => forecastDays.find((item) => item.id === selectedDayId) ?? forecastDays[0],
-    [selectedDayId],
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadWeather() {
+      try {
+        const nextProfile = await getMyProfile();
+
+        if (cancelled) return;
+
+        setProfile(nextProfile);
+
+        if (!nextProfile.kabupaten) {
+          setErrorMessage("Kabupaten belum diisi. Lengkapi profil dulu ya.");
+          return;
+        }
+
+        const nextWeather = await getWeather(nextProfile.kabupaten);
+
+        if (cancelled) return;
+
+        setWeatherResponse(nextWeather);
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(
+            error instanceof Error ? error.message : "Gagal memuat data cuaca.",
+          );
+        }
+      }
+    }
+
+    void loadWeather();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const forecastItems = weatherResponse?.data.data_cuaca.list ?? [];
+  const selectedDay: WeatherForecastItem | null = forecastItems[selectedIndex] ?? forecastItems[0] ?? null;
+  const adviceItems = weatherResponse?.data.rekomendasi_ai ? [weatherResponse.data.rekomendasi_ai] : [];
+
+  const forecastCards = useMemo(
+    () =>
+      forecastItems.map((item, index) => ({
+        id: `${item.dt}-${index}`,
+        day: index === 0 ? "Hari ini" : formatForecastDay(item.dt_txt),
+        temp: `${Math.round(item.main.temp)}°C`,
+        iconSrc: getWeatherIconSrc(item.weather[0]?.description ?? ""),
+        iconAlt: item.weather[0]?.description ?? "Cuaca",
+      })),
+    [forecastItems],
   );
 
   return (
@@ -96,34 +91,51 @@ export default function WeatherPage() {
 
             <div className="flex flex-col gap-[15px]">
               <WeatherOverviewCard
-                temperature={selectedDay.temp}
-                condition={selectedDay.condition}
-                iconSrc={selectedDay.iconSrc}
-                iconAlt={selectedDay.iconAlt}
-                metrics={[
-                  { iconSrc: "/icons/humidity.png", iconAlt: "Kelembapan", value: "72%" },
-                  { iconSrc: "/icons/wind.png", iconAlt: "Kecepatan angin", value: "12 km/h" },
-                  { iconSrc: "/icons/temperature.png", iconAlt: "Suhu", value: "28°C" },
-                ]}
+                temperature={selectedDay ? `${Math.round(selectedDay.main.temp)}°C` : "--"}
+                condition={
+                  selectedDay
+                    ? `${selectedDay.weather[0]?.description ?? "Tidak diketahui"} - ${profile?.kabupaten ?? ""}`
+                    : errorMessage || "Belum ada data cuaca"
+                }
+                iconSrc={selectedDay ? getWeatherIconSrc(selectedDay.weather[0]?.description ?? "") : "/icons/berawan.png"}
+                iconAlt={selectedDay?.weather[0]?.description ?? "Cuaca"}
+                metrics={
+                  selectedDay
+                    ? getWeatherMetrics(selectedDay)
+                    : [
+                        { iconSrc: "/icons/humidity.png", iconAlt: "Kelembapan", value: "--" },
+                        { iconSrc: "/icons/wind.png", iconAlt: "Kecepatan angin", value: "--" },
+                        { iconSrc: "/icons/temperature.png", iconAlt: "Suhu", value: "--" },
+                      ]
+                }
               />
 
               <div className="flex gap-2">
-                {forecastDays.map((day) => (
-                  <ForecastDayCard
-                    key={day.id}
-                    day={day.day}
-                    iconSrc={day.iconSrc}
-                    iconAlt={day.iconAlt}
-                    temp={day.temp}
-                    selected={day.id === selectedDayId}
-                    onClick={() => setSelectedDayId(day.id)}
-                  />
-                ))}
+                {forecastCards.length > 0 ? (
+                  forecastCards.map((day, index) => (
+                    <ForecastDayCard
+                      key={day.id}
+                      day={day.day}
+                      iconSrc={day.iconSrc}
+                      iconAlt={day.iconAlt}
+                      temp={day.temp}
+                      selected={index === selectedIndex}
+                      onClick={() => setSelectedIndex(index)}
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-[10px] border border-[#e0e0de] bg-white px-4 py-5 text-[14px] leading-[21px] text-[#6b6b68]">
+                    {errorMessage || "Belum ada data prakiraan cuaca."}
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          <WeatherAdviceCard title="Saran dari PanenIn" items={selectedDay.advice} />
+          <WeatherAdviceCard
+            title="Saran dari PanenIn"
+            items={adviceItems.length > 0 ? adviceItems : ["Saran cuaca belum tersedia saat ini."]}
+          />
         </div>
       </section>
     </main>

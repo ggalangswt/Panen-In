@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 
+import { ensureLegacyUserRow } from '@/lib/legacy-user'
 import { getSupabaseAuth } from '@/lib/supabase-server'
 
 export type AuthenticatedUser = {
@@ -41,8 +42,12 @@ export async function requireAuthenticatedUser(
     throw new UnauthorizedError('Invalid or expired bearer token')
   }
 
-  return {
+  const authenticatedUser = {
     id: user.id,
     email: user.email ?? null,
   }
+
+  await ensureLegacyUserRow(authenticatedUser)
+
+  return authenticatedUser
 }

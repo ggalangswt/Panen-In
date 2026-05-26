@@ -9,6 +9,32 @@ import { NextRequest, NextResponse } from 'next/server'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+function buildFallbackRecommendation(cuacaHariIni: {
+  main: { humidity: number; temp: number }
+  weather: Array<{ main: string; description: string }>
+  wind: { speed: number }
+}) {
+  const kondisiUtama = cuacaHariIni.weather[0]?.main?.toLowerCase() ?? ''
+
+  if (kondisiUtama.includes('rain')) {
+    return 'Ada potensi hujan hari ini, jadi tunda penyemprotan dan cek drainase lahan agar tidak becek.'
+  }
+
+  if (cuacaHariIni.main.humidity >= 80) {
+    return 'Kelembaban cukup tinggi hari ini, jadi periksa daun dan batang untuk mencegah jamur sejak awal.'
+  }
+
+  if (cuacaHariIni.main.temp >= 32) {
+    return 'Suhu cukup panas hari ini, jadi prioritaskan penyiraman pagi atau sore agar tanaman tidak stres.'
+  }
+
+  if (cuacaHariIni.wind.speed >= 8) {
+    return 'Angin cukup kencang hari ini, jadi cek penyangga tanaman dan hindari aplikasi pupuk daun saat siang.'
+  }
+
+  return 'Cuaca relatif stabil hari ini, jadi lanjutkan perawatan rutin sambil tetap pantau kelembaban tanah.'
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuthenticatedUser(request)
@@ -57,8 +83,18 @@ export async function GET(request: NextRequest) {
       Jawab hanya dengan kalimat sarannya saja, tanpa tambahan apapun.
     `
 
-    const result = await getGeminiModel().generateContent(prompt)
-    const rekomendasi_ai = result.response.text().trim()
+    let rekomendasi_ai = buildFallbackRecommendation(cuacaHariIni)
+
+    try {
+      const result = await getGeminiModel().generateContent(prompt)
+      const generatedText = result.response.text().trim()
+
+      if (generatedText) {
+        rekomendasi_ai = generatedText
+      }
+    } catch (error) {
+      console.warn('Gemini fallback used for /api/cuaca:', error)
+    }
 
     // Simpan ke cache (upsert)
     const { data, error } = await supabaseAdmin

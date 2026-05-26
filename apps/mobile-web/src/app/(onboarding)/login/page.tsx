@@ -1,15 +1,46 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { AppRoutes } from "@/constants/routes";
+import { useAuth } from "@/components/providers/AuthProvider";
 import { CarouselDots } from "@/features/onboarding/components/CarouselDots";
 import { AuthInputField } from "@/features/onboarding/components/AuthInputField";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { signInWithEmailPassword } from "@/services/auth";
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { session, loading } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!loading && session) {
+      router.replace(searchParams.get("next") || AppRoutes.home);
+    }
+  }, [loading, router, searchParams, session]);
+
+  const handleLogin = async () => {
+    setSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      await signInWithEmailPassword(email.trim(), password);
+      router.replace(searchParams.get("next") || AppRoutes.home);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal masuk. Coba lagi.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-[#f7f7f5] text-[#1a1a18]">
@@ -39,13 +70,29 @@ export default function LoginPage() {
                   icon="password"
                   placeholder="Masukkan password"
                   type="password"
+                  value={password}
+                  onChange={setPassword}
                 />
                 <AuthInputField
                   icon="email"
                   placeholder="Tulis emailmu di sini"
                   type="email"
+                  value={email}
+                  onChange={setEmail}
                 />
               </div>
+
+              {searchParams.get("registered") === "1" ? (
+                <p className="text-center text-[12px] leading-[18px] text-[#2d6a2d]">
+                  Akun berhasil dibuat. Masuk untuk lanjutkan ke PanenIn.
+                </p>
+              ) : null}
+
+              {errorMessage ? (
+                <p className="text-center text-[12px] leading-[18px] text-[#b82c2c]">
+                  {errorMessage}
+                </p>
+              ) : null}
             </div>
 
             <div className="sticky bottom-0 left-0 right-0 -mx-[16px] mt-auto bg-[#f7f7f5] px-[16px] pb-6 pt-4">
@@ -53,9 +100,10 @@ export default function LoginPage() {
                 <PrimaryButton
                   variant="solid"
                   fullWidth
-                  onClick={() => router.push(AppRoutes.home)}
+                  disabled={submitting}
+                  onClick={handleLogin}
                 >
-                  Masuk
+                  {submitting ? "Masuk..." : "Masuk"}
                 </PrimaryButton>
                 <p className="text-center text-[15px] font-medium leading-[22.5px] text-[#2d6a2d]">
                   Belum punya akun?{" "}
@@ -72,5 +120,13 @@ export default function LoginPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#f7f7f5]" />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

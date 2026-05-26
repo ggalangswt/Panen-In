@@ -1,23 +1,67 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { FeatureScreenHeader } from "@/components/layout/FeatureScreenHeader";
 import { StickyActionBar } from "@/components/layout/StickyActionBar";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { SectionTitle } from "@/components/ui/SectionTitle";
-import { harvestNotes } from "@/constants/notes";
 import { AppRoutes } from "@/constants/routes";
 import { ActivityTimeline } from "@/features/notes/components/ActivityTimeline";
+import {
+  getHarvestTimeline,
+  listHarvestNotes,
+  type HarvestNoteRecord,
+  type HarvestTimelineResponse,
+} from "@/services/panenin-api";
+import {
+  formatCompactCurrency,
+  formatDateLabel,
+  getCalculatorMetrics,
+  getRelatedCalculator,
+} from "@/services/display";
 
 export default function NoteDetailPage() {
   const params = useParams<{ noteId: string }>();
   const router = useRouter();
+  const [note, setNote] = useState<HarvestNoteRecord | null>(null);
+  const [timeline, setTimeline] = useState<HarvestTimelineResponse["timeline"]>([]);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const note = useMemo(
-    () => harvestNotes.find((item) => item.id === params.noteId) ?? harvestNotes[0],
-    [params.noteId],
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadNoteDetail() {
+      try {
+        const [notes, timelineResponse] = await Promise.all([
+          listHarvestNotes(),
+          getHarvestTimeline(params.noteId),
+        ]);
+
+        if (cancelled) return;
+
+        setNote(notes.find((item) => item.id === params.noteId) ?? null);
+        setTimeline(timelineResponse.timeline);
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(
+            error instanceof Error ? error.message : "Gagal memuat detail catatan panen.",
+          );
+        }
+      }
+    }
+
+    void loadNoteDetail();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [params.noteId]);
+
+  const financialMetrics = useMemo(
+    () => getCalculatorMetrics(note ? getRelatedCalculator(note) : null),
+    [note],
   );
 
   return (
@@ -32,20 +76,20 @@ export default function NoteDetailPage() {
             </p>
 
             <div className="mt-[15px] flex flex-col items-center gap-2 text-[#2d6a2d]">
-              <p className="text-[14px] font-medium leading-[21px]">Keuntungan Besih</p>
+              <p className="text-[14px] font-medium leading-[21px]">Keuntungan Bersih</p>
               <p className="text-[22px] font-medium leading-[29px]">
-                {note.financial.profit}
+                {formatCompactCurrency(financialMetrics.profit)}
               </p>
               <div className="rounded-full border border-[#c6dfc6] bg-white px-[10px] py-2 text-[14px] font-medium leading-[21px]">
-                Musim ini untung
+                {financialMetrics.profit > 0 ? "Musim ini untung" : financialMetrics.profit < 0 ? "Musim ini rugi" : "Musim ini netral"}
               </div>
             </div>
 
             <div className="mt-[15px] grid grid-cols-3 gap-[10px]">
               {[
-                { label: "Modal", value: note.financial.modal },
-                { label: "Pendapatan", value: note.financial.revenue },
-                { label: "Margin", value: note.financial.margin },
+                { label: "Modal", value: formatCompactCurrency(financialMetrics.totalModal) },
+                { label: "Pendapatan", value: formatCompactCurrency(financialMetrics.revenue) },
+                { label: "Margin", value: `${financialMetrics.marginPercent}%` },
               ].map((item) => (
                 <div
                   key={item.label}
@@ -64,7 +108,17 @@ export default function NoteDetailPage() {
 
           <div className="flex flex-col gap-[10px]">
             <SectionTitle>AKTIVITAS TANAM</SectionTitle>
-            <ActivityTimeline items={[...note.activities]} />
+            {errorMessage ? (
+              <p className="text-[12px] leading-[18px] text-[#b82c2c]">{errorMessage}</p>
+            ) : (
+              <ActivityTimeline
+                items={timeline.map((item) => ({
+                  date: formatDateLabel(item.tanggal),
+                  title: item.judul,
+                  description: item.deskripsi,
+                }))}
+              />
+            )}
           </div>
         </div>
 

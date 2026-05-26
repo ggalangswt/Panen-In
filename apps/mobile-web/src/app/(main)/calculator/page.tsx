@@ -13,6 +13,15 @@ import { plantOptions, type PlantId } from "@/constants/plants";
 import { AppRoutes } from "@/constants/routes";
 import { CalculationHeroCard } from "@/features/calculator/components/CalculationHeroCard";
 import { ExpenseBreakdownCard } from "@/features/calculator/components/ExpenseBreakdownCard";
+import {
+  createCalculator,
+  type CalculatorRecord,
+} from "@/services/panenin-api";
+import {
+  formatCompactCurrency,
+  formatCurrency,
+  getCalculatorMetrics,
+} from "@/services/display";
 
 type Expense = {
   id: string;
@@ -21,20 +30,8 @@ type Expense = {
   isCustom?: boolean;
 };
 
-function formatCurrency(value: number) {
-  return `Rp ${new Intl.NumberFormat("id-ID").format(value)}`;
-}
-
 function parseNumberInput(value: string) {
   return Number(value.replace(/\D/g, "")) || 0;
-}
-
-function formatCompactCurrency(value: number) {
-  if (value >= 1_000_000) {
-    return `Rp ${(value / 1_000_000).toFixed(1).replace(".0", "")}jt`;
-  }
-
-  return formatCurrency(value);
 }
 
 export default function CalculatorPage() {
@@ -50,17 +47,14 @@ export default function CalculatorPage() {
   const [harvestKg, setHarvestKg] = useState("850");
   const [pricePerKg, setPricePerKg] = useState(8000);
   const [showResult, setShowResult] = useState(false);
+  const [result, setResult] = useState<CalculatorRecord | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const totalModal = useMemo(
-    () => expenses.reduce((sum, item) => sum + item.amount, 0),
-    [expenses],
-  );
-  const revenue =
-    (Number(harvestKg.replace(/\D/g, "")) || 0) * pricePerKg;
-  const profit = revenue - totalModal;
-  const margin = revenue > 0 ? `${Math.round((profit / revenue) * 100)}%` : "0%";
   const selectedPlantLabel =
     plantOptions.find((plant) => plant.id === selectedPlant)?.label ?? "Padi";
+
+  const derivedMetrics = useMemo(() => getCalculatorMetrics(result), [result]);
 
   const handleExpenseChange = (index: number, nextAmount: number) => {
     setExpenses((current) =>
@@ -97,6 +91,33 @@ export default function CalculatorPage() {
     }
 
     router.push(AppRoutes.home);
+  };
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      const calculator = await createCalculator({
+        musim_tanam: period.trim() || "Musim berjalan",
+        jenis_tanaman: selectedPlantLabel,
+        item_modal: expenses.map((expense) => ({
+          nama: expense.label,
+          nilai: expense.amount,
+        })),
+        hasil_kg: Number(harvestKg || 0),
+        harga_per_kg: pricePerKg,
+      });
+
+      setResult(calculator);
+      setShowResult(true);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal menghitung usaha tani.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -201,11 +222,15 @@ export default function CalculatorPage() {
                 </div>
               </div>
             </div>
+
+            {errorMessage ? (
+              <p className="text-[12px] leading-[18px] text-[#b82c2c]">{errorMessage}</p>
+            ) : null}
           </div>
 
           <StickyActionBar>
-            <PrimaryButton fullWidth onClick={() => setShowResult(true)}>
-              Hitung Sekarang
+            <PrimaryButton fullWidth disabled={submitting} onClick={handleSubmit}>
+              {submitting ? "Menghitung..." : "Hitung Sekarang"}
             </PrimaryButton>
           </StickyActionBar>
         </section>
@@ -214,10 +239,10 @@ export default function CalculatorPage() {
           <div className="flex flex-1 flex-col gap-[15px] px-[14px] pb-6 pt-[15px]">
             <CalculationHeroCard
               plantLabel={selectedPlantLabel}
-              profit={formatCurrency(profit)}
-              modal={formatCompactCurrency(totalModal)}
-              revenue={formatCompactCurrency(revenue)}
-              margin={margin}
+              profit={formatCurrency(derivedMetrics.profit)}
+              modal={formatCompactCurrency(derivedMetrics.totalModal)}
+              revenue={formatCompactCurrency(derivedMetrics.revenue)}
+              margin={`${derivedMetrics.marginPercent}%`}
             />
 
             <div className="flex flex-col gap-[10px]">
@@ -228,7 +253,7 @@ export default function CalculatorPage() {
                   value: formatCurrency(expense.amount),
                 }))}
                 footerLabel="Total Modal"
-                footerValue={formatCurrency(totalModal)}
+                footerValue={formatCurrency(derivedMetrics.totalModal)}
               />
             </div>
 
@@ -252,6 +277,7 @@ export default function CalculatorPage() {
                 fullWidth
                 variant="light"
                 className="border border-[#c6dfc6] bg-[#ebf5eb] text-[15px] leading-[22.5px] text-[#2d6a2d]"
+                disabled
               >
                 Simpan ke Catatan
               </PrimaryButton>

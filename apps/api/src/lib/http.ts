@@ -23,6 +23,7 @@ export function handleRouteError(error: unknown) {
     return unauthorized(error.message)
   }
 
+  console.error(error)
   const message = error instanceof Error ? error.message : 'Internal server error'
   return NextResponse.json({ error: message }, { status: 500 })
 }
