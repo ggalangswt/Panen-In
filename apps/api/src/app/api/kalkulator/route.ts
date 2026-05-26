@@ -1,11 +1,16 @@
-import { supabaseServer } from '@/lib/supabase-server'
+import { requireAuthenticatedUser } from '@/lib/auth'
+import { badRequest, handleRouteError } from '@/lib/http'
+import { getSupabaseAdmin } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
+
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAuthenticatedUser(request)
     const body = await request.json()
     const {
-      user_id,
       musim_tanam,
       jenis_tanaman,
       item_modal,
@@ -14,11 +19,15 @@ export async function POST(request: NextRequest) {
     } = body
 
     // Validasi input
-    if (!user_id || !musim_tanam || !jenis_tanaman || !item_modal || !hasil_kg || !harga_per_kg) {
-      return NextResponse.json(
-        { error: 'Semua field wajib diisi' },
-        { status: 400 }
-      )
+    if (
+      !musim_tanam ||
+      !jenis_tanaman ||
+      !Array.isArray(item_modal) ||
+      item_modal.length === 0 ||
+      hasil_kg == null ||
+      harga_per_kg == null
+    ) {
+      return badRequest('musim_tanam, jenis_tanaman, item_modal, hasil_kg, dan harga_per_kg wajib diisi')
     }
 
     // Hitung total modal dari item_modal
@@ -27,10 +36,11 @@ export async function POST(request: NextRequest) {
     )
 
     // Insert ke Supabase — kolom generated dihitung otomatis oleh DB
-    const { data, error } = await supabaseServer
+    const supabaseAdmin = getSupabaseAdmin()
+    const { data, error } = await supabaseAdmin
       .from('kalkulator_usaha')
       .insert({
-        user_id,
+        user_id: user.id,
         musim_tanam,
         jenis_tanaman,
         item_modal,
@@ -48,31 +58,21 @@ export async function POST(request: NextRequest) {
       data
     })
 
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleRouteError(error)
   }
 }
 
 // GET — ambil semua riwayat kalkulator milik user
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const user_id = searchParams.get('user_id')
+    const user = await requireAuthenticatedUser(request)
 
-    if (!user_id) {
-      return NextResponse.json(
-        { error: 'user_id wajib diisi' },
-        { status: 400 }
-      )
-    }
-
-    const { data, error } = await supabaseServer
+    const supabaseAdmin = getSupabaseAdmin()
+    const { data, error } = await supabaseAdmin
       .from('kalkulator_usaha')
       .select('*')
-      .eq('user_id', user_id)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
     if (error) throw error
@@ -82,10 +82,7 @@ export async function GET(request: NextRequest) {
       data
     })
 
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    )
+  } catch (error) {
+    return handleRouteError(error)
   }
 }
