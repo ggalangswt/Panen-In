@@ -1,3 +1,4 @@
+import { reverseGeocodeWithNominatim } from '@/lib/geocoding'
 import { handleRouteError, badRequest, notFound } from '@/lib/http'
 import { reverseGeocode } from '@/lib/openweather'
 import { findIndonesiaRegencyFromCandidates } from '@panenin/utils'
@@ -24,17 +25,40 @@ export async function GET(request: NextRequest) {
       return notFound('Lokasi tidak ditemukan di Indonesia')
     }
 
-    const matchedRegency = findIndonesiaRegencyFromCandidates(
-      indonesiaResults.flatMap((item) => [item.name, item.state ?? '']),
+    const openWeatherMatch = findIndonesiaRegencyFromCandidates(
+      indonesiaResults.flatMap((item) => [
+        item.name,
+        item.state ?? '',
+        item.local_names?.id ?? '',
+        item.local_names?.en ?? '',
+      ]),
     )
+
+    let matchedRegency = openWeatherMatch
+    let sourceName = indonesiaResults
+      .map((item) =>
+        [item.local_names?.id ?? item.name, item.state].filter(Boolean).join(', '),
+      )
+      .find(Boolean)
+
+    if (!matchedRegency) {
+      const fallback = await reverseGeocodeWithNominatim(lat, lon)
+      const fallbackCandidates = [
+        fallback.address?.county ?? '',
+        fallback.address?.city ?? '',
+        fallback.address?.municipality ?? '',
+        fallback.address?.town ?? '',
+        fallback.address?.village ?? '',
+        fallback.address?.state ?? '',
+      ]
+
+      matchedRegency = findIndonesiaRegencyFromCandidates(fallbackCandidates)
+      sourceName = sourceName ?? fallback.display_name
+    }
 
     if (!matchedRegency) {
       return notFound('Kabupaten/kota dari lokasi ini belum bisa dipetakan')
     }
-
-    const sourceName = indonesiaResults
-      .map((item) => [item.name, item.state].filter(Boolean).join(', '))
-      .find(Boolean)
 
     return NextResponse.json({
       status: 'success',

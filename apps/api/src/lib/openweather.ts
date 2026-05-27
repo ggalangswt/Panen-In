@@ -10,6 +10,7 @@ type OpenWeatherCoordinates = {
   name: string
   state?: string
   country: string
+  local_names?: Record<string, string>
 }
 
 async function fetchJson<T>(url: string) {

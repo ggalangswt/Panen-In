@@ -1,7 +1,5 @@
 "use client";
 
-import { apiRequest } from "@/services/api";
-
 const LOCATION_OPT_IN_KEY = "panenin.location-opt-in";
 
 export type BrowserLocationPermissionState =
@@ -97,9 +95,23 @@ export async function requestCurrentCoordinates() {
 
 export async function resolveKabupatenFromCurrentLocation() {
   const coordinates = await requestCurrentCoordinates();
-  const payload = await apiRequest<ReverseLocationPayload>(
+  const response = await fetch(
     `/api/lokasi/reverse?lat=${coordinates.latitude}&lon=${coordinates.longitude}`,
   );
+
+  const payload = (await response.json().catch(() => null)) as ReverseLocationPayload | null;
+
+  if (!response.ok) {
+    throw new Error(
+      payload && "error" in payload && typeof (payload as { error?: unknown }).error === "string"
+        ? String((payload as { error: string }).error)
+        : "Gagal memetakan lokasi perangkat.",
+    );
+  }
+
+  if (!payload) {
+    throw new Error("Gagal memetakan lokasi perangkat.");
+  }
 
   return payload.data;
 }
