@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 import { AppRoutes } from "@/constants/routes";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
-import { FeatureTextInput } from "@/components/ui/FeatureTextInput";
+import { LocationCombobox } from "@/components/ui/LocationCombobox";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { AuthInputField } from "@/features/onboarding/components/AuthInputField";
 import { OnboardingHero } from "@/features/onboarding/components/OnboardingHero";
@@ -18,6 +18,7 @@ import {
   signUpWithEmailPassword,
   syncPendingOnboardingDraft,
 } from "@/services/auth";
+import { resolveKabupatenFromCurrentLocation } from "@/services/location";
 
 const totalSteps = 4;
 const vineyardImage = "/login-hero.png";
@@ -33,6 +34,7 @@ export function RegisterFlow() {
   const [kabupaten, setKabupaten] = useState("");
   const [selectedPlants, setSelectedPlants] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [detectingLocation, setDetectingLocation] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   const nextStep = () => setStep((current) => Math.min(current + 1, totalSteps - 1));
@@ -47,6 +49,22 @@ export function RegisterFlow() {
       router.replace(AppRoutes.home);
     }
   }, [loading, router, session]);
+
+  const handleUseCurrentLocation = async () => {
+    setDetectingLocation(true);
+    setErrorMessage("");
+
+    try {
+      const result = await resolveKabupatenFromCurrentLocation();
+      setKabupaten(result.kabupaten);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal membaca lokasi perangkat.",
+      );
+    } finally {
+      setDetectingLocation(false);
+    }
+  };
 
   const handleComplete = async () => {
     setSubmitting(true);
@@ -198,16 +216,26 @@ export function RegisterFlow() {
         </div>
       ),
       fields: (
-        <FeatureTextInput
-          placeholder="Tulis kabupaten atau kota kamu"
-          value={kabupaten}
-          onChange={(event) => setKabupaten(event.target.value)}
-        />
+        <div className="flex flex-col gap-2">
+          <LocationCombobox
+            placeholder="Cari kabupaten atau kota kamu"
+            value={kabupaten}
+            onChange={setKabupaten}
+          />
+          <p className="text-[12px] leading-[18px] text-[#6b6b68]">
+            Pilih manual atau pakai lokasi perangkat untuk mengisi otomatis.
+          </p>
+        </div>
       ),
       footer: (
         <>
-          <PrimaryButton variant="solid" fullWidth onClick={nextStep}>
-            Izinkan Lokasi
+          <PrimaryButton
+            variant="solid"
+            fullWidth
+            disabled={detectingLocation}
+            onClick={handleUseCurrentLocation}
+          >
+            {detectingLocation ? "Mendeteksi Lokasi..." : "Izinkan Lokasi"}
           </PrimaryButton>
           <button
             type="button"
@@ -249,6 +277,16 @@ export function RegisterFlow() {
             <div className="sticky bottom-0 left-0 right-0 -mx-[16px] mt-auto bg-[#f7f7f5] px-[16px] pb-6 pt-4">
               <div className="flex w-full flex-col items-center gap-[15px]">
                 {slideContent.footer}
+                {step === 2 ? (
+                  <PrimaryButton variant="light" fullWidth onClick={nextStep}>
+                    Lanjut
+                  </PrimaryButton>
+                ) : null}
+                {errorMessage && step === 2 ? (
+                  <p className="text-center text-[12px] leading-[18px] text-[#b82c2c]">
+                    {errorMessage}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>

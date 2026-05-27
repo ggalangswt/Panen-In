@@ -22,6 +22,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@panenin/utils": [
+        "../../packages/utils/src"
       ]
     },
     "plugins": [

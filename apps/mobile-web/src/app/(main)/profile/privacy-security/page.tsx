@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { FeatureScreenHeader } from "@/components/layout/FeatureScreenHeader";
@@ -10,11 +10,76 @@ import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { ToggleSwitch } from "@/components/ui/ToggleSwitch";
 import { AppRoutes } from "@/constants/routes";
 import { ProfileMenuRow } from "@/features/profile/components/ProfileMenuRow";
+import {
+  getBrowserLocationPermissionState,
+  getStoredLocationOptIn,
+  resolveKabupatenFromCurrentLocation,
+  setStoredLocationOptIn,
+} from "@/services/location";
+import { getMyProfile, updateMyProfile } from "@/services/panenin-api";
 
 export default function ProfilePrivacySecurityPage() {
   const router = useRouter();
   const [activeDeviceMonitoring, setActiveDeviceMonitoring] = useState(false);
   const [locationAllowed, setLocationAllowed] = useState(false);
+  const [locationMessage, setLocationMessage] = useState("");
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [currentKabupaten, setCurrentKabupaten] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLocationState() {
+      const [permissionState, profile] = await Promise.all([
+        getBrowserLocationPermissionState(),
+        getMyProfile().catch(() => null),
+      ]);
+
+      if (cancelled) return;
+
+      const enabled = permissionState !== "denied" && getStoredLocationOptIn();
+      setLocationAllowed(enabled);
+      setCurrentKabupaten(profile?.kabupaten || "");
+    }
+
+    void loadLocationState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleLocationToggle = async (checked: boolean) => {
+    setLocationMessage("");
+
+    if (!checked) {
+      setStoredLocationOptIn(false);
+      setLocationAllowed(false);
+      setLocationMessage(
+        "Akses lokasi dimatikan di aplikasi. Untuk mencabut izin browser sepenuhnya, ubah di pengaturan browser.",
+      );
+      return;
+    }
+
+    setLocationLoading(true);
+
+    try {
+      const result = await resolveKabupatenFromCurrentLocation();
+      await updateMyProfile({ kabupaten: result.kabupaten });
+      setStoredLocationOptIn(true);
+      setLocationAllowed(true);
+      setCurrentKabupaten(result.kabupaten);
+      setLocationMessage(`Lokasi aktif. Kabupaten terisi ke ${result.kabupaten}.`);
+    } catch (error) {
+      setStoredLocationOptIn(false);
+      setLocationAllowed(false);
+      setLocationMessage(
+        error instanceof Error ? error.message : "Gagal mengaktifkan akses lokasi.",
+      );
+    } finally {
+      setLocationLoading(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-[#f7f7f5]">
@@ -60,19 +125,31 @@ export default function ProfilePrivacySecurityPage() {
             <ProfileMenuRow
               icon={<AppIcon src="/icons/privacy.svg" alt="Ikon privasi lokasi" size={20} />}
               label="Izinkan Lokasi"
+              description={currentKabupaten || "Belum ada kabupaten dari lokasi perangkat"}
               rightSlot={
                 <ToggleSwitch
                   checked={locationAllowed}
-                  onChange={setLocationAllowed}
+                  onChange={handleLocationToggle}
                   ariaLabel="Izinkan lokasi"
                 />
               }
             />
+            {locationMessage ? (
+              <p className="pt-2 text-[12px] leading-[18px] text-[#6b6b68]">
+                {locationMessage}
+              </p>
+            ) : null}
           </div>
         </div>
 
         <StickyActionBar>
-          <PrimaryButton fullWidth>Simpan Pengaturan</PrimaryButton>
+          <PrimaryButton
+            fullWidth
+            disabled={locationLoading}
+            onClick={() => router.push(AppRoutes.profile)}
+          >
+            {locationLoading ? "Menyimpan..." : "Simpan Pengaturan"}
+          </PrimaryButton>
         </StickyActionBar>
       </section>
     </main>

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { FeatureScreenHeader } from "@/components/layout/FeatureScreenHeader";
 import { StickyActionBar } from "@/components/layout/StickyActionBar";
+import { LocationCombobox } from "@/components/ui/LocationCombobox";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { FeatureTextInput } from "@/components/ui/FeatureTextInput";
 import { SectionTitle } from "@/components/ui/SectionTitle";
@@ -122,7 +123,7 @@ export default function PersonalInfoPage() {
 
           <div className="flex flex-col gap-1">
             <SectionTitle>Kabupaten / Kota</SectionTitle>
-            <FeatureTextInput value={kabupaten} onChange={(event) => setKabupaten(event.target.value)} />
+            <LocationCombobox value={kabupaten} onChange={setKabupaten} />
           </div>
 
           <div className="flex flex-col gap-1">

@@ -3,6 +3,7 @@ import { badRequest, handleRouteError } from '@/lib/http'
 import { ensureLegacyUserRow } from '@/lib/legacy-user'
 import { ensureProfile } from '@/lib/profile'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
+import { findIndonesiaRegencyByName } from '@panenin/utils'
 import { NextRequest, NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
@@ -45,7 +46,17 @@ export async function PATCH(request: NextRequest) {
     }
 
     if ('kabupaten' in body) {
-      updates.kabupaten = body.kabupaten ? String(body.kabupaten).trim() : null
+      if (!body.kabupaten) {
+        updates.kabupaten = null
+      } else {
+        const matchedRegency = findIndonesiaRegencyByName(String(body.kabupaten))
+
+        if (!matchedRegency) {
+          return badRequest('kabupaten harus dipilih dari daftar kabupaten/kota Indonesia')
+        }
+
+        updates.kabupaten = matchedRegency.name
+      }
     }
 
     if ('preferred_plants' in body) {

@@ -111,6 +111,12 @@ export type WeatherApiResponse = {
   };
 };
 
+export type ReverseLocationResponse = {
+  kabupaten: string;
+  matched_label: string;
+  source_name: string;
+};
+
 export type HarvestSummaryResponse = {
   status: string;
   total_musim?: number;
@@ -186,6 +192,14 @@ export async function getWeather(kabupaten: string) {
   return apiRequest<WeatherApiResponse>(
     `/api/cuaca?kabupaten=${encodeURIComponent(kabupaten)}`,
   );
+}
+
+export async function reverseResolveLocation(lat: number, lon: number) {
+  const response = await apiRequest<{ status: string; data: ReverseLocationResponse }>(
+    `/api/lokasi/reverse?lat=${lat}&lon=${lon}`,
+  );
+
+  return response.data;
 }
 
 export async function createConsultation(payload: {
