@@ -156,18 +156,18 @@ export function RegisterFlow() {
       fields: (
         <div className="flex w-full flex-col gap-2.5">
           <AuthInputField
-            icon="password"
-            placeholder="Masukkan password"
-            type="password"
-            value={password}
-            onChange={setPassword}
-          />
-          <AuthInputField
             icon="email"
             placeholder="Tulis emailmu di sini"
             type="email"
             value={email}
             onChange={setEmail}
+          />
+          <AuthInputField
+            icon="password"
+            placeholder="Masukkan password"
+            type="password"
+            value={password}
+            onChange={setPassword}
           />
         </div>
       ),
