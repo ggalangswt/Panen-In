@@ -33,7 +33,7 @@ export function formatDateLabel(value: string) {
   }).format(date);
 }
 
-export function formatForecastDay(value: string) {
+export function formatForecastTime(value: string) {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
@@ -41,30 +41,9 @@ export function formatForecastDay(value: string) {
   }
 
   return new Intl.DateTimeFormat("id-ID", {
-    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(date);
-}
-
-export function groupForecastByDay<T extends { dt_txt: string }>(items: T[], limit = 5) {
-  const grouped: T[] = [];
-  const seenDates = new Set<string>();
-
-  for (const item of items) {
-    const dateKey = item.dt_txt.slice(0, 10);
-
-    if (seenDates.has(dateKey)) {
-      continue;
-    }
-
-    seenDates.add(dateKey);
-    grouped.push(item);
-
-    if (grouped.length >= limit) {
-      break;
-    }
-  }
-
-  return grouped;
 }
 
 export function getWeatherIconSrc(condition: string) {
