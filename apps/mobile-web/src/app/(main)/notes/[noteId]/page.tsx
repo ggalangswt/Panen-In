@@ -175,19 +175,9 @@ export default function NoteDetailPage() {
         </div>
 
         <StickyActionBar>
-          <div className="grid grid-cols-2 gap-[10px]">
-            <PrimaryButton
-              fullWidth
-              variant="light"
-              className="border border-[#c6dfc6] bg-[#ebf5eb] text-[15px] leading-[22.5px] text-[#2d6a2d]"
-              onClick={() => router.push(AppRoutes.noteEdit(params.noteId))}
-            >
-              Edit Catatan
-            </PrimaryButton>
-            <PrimaryButton fullWidth onClick={() => router.push(AppRoutes.consultation)}>
-              Konsultasi AI
-            </PrimaryButton>
-          </div>
+          <PrimaryButton fullWidth onClick={() => router.push(AppRoutes.consultation)}>
+            Konsultasi AI
+          </PrimaryButton>
         </StickyActionBar>
       </section>
     </main>
