@@ -22,6 +22,12 @@ export type NotificationSettings = {
   timezone: string;
 };
 
+export type PlantingGuideReminder = {
+  plant_id: string;
+  plant_label: string;
+  active: boolean;
+} | null;
+
 export type ConsultationAiResult = {
   penyebab: string[];
   rekomendasi: string[];
@@ -173,6 +179,29 @@ export async function updateNotificationSettings(
     },
   );
   return payload.data;
+}
+
+export async function getPlantingGuideReminder() {
+  const payload = await apiRequest<{ status: string; data: PlantingGuideReminder }>(
+    "/api/panduan-tanam/reminder",
+  );
+
+  return payload.data;
+}
+
+export async function savePlantingGuideReminder(payload: {
+  plant_id: string;
+  plant_label: string;
+}) {
+  const response = await apiRequest<{ status: string; data: PlantingGuideReminder }>(
+    "/api/panduan-tanam/reminder",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+
+  return response.data;
 }
 
 export async function registerNotificationToken(payload: {

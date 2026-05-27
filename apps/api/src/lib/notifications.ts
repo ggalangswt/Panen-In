@@ -2,6 +2,7 @@ export type NotificationSettingsRow = {
   user_id: string
   notifications_enabled: boolean
   weather_morning: boolean
+  planting_reminder?: boolean
   morning_hour: number
   timezone: string | null
 }
@@ -9,6 +10,7 @@ export type NotificationSettingsRow = {
 export type NotificationLogRow = {
   user_id: string
   sent_at: string
+  tipe?: string
 }
 
 export function getSafeTimezone(timezone: string | null | undefined) {
@@ -41,6 +43,15 @@ function getLocalParts(date: Date, timezone: string) {
   }
 }
 
+export function shouldSendAtMorning(
+  settings: NotificationSettingsRow,
+  now: Date,
+) {
+  const timezone = getSafeTimezone(settings.timezone)
+  const { hour } = getLocalParts(now, timezone)
+  return hour === settings.morning_hour
+}
+
 export function shouldSendWeatherMorningNow(
   settings: NotificationSettingsRow,
   now: Date,
@@ -49,12 +60,28 @@ export function shouldSendWeatherMorningNow(
     return false
   }
 
-  const timezone = getSafeTimezone(settings.timezone)
-  const { hour } = getLocalParts(now, timezone)
-  return hour === settings.morning_hour
+  return shouldSendAtMorning(settings, now)
 }
 
 export function hasSentWeatherMorningToday(
+  userId: string,
+  settings: NotificationSettingsRow,
+  logs: NotificationLogRow[],
+  now: Date,
+) {
+  const timezone = getSafeTimezone(settings.timezone)
+  const currentDateKey = getLocalParts(now, timezone).dateKey
+
+  return logs.some((log) => {
+    if (log.user_id !== userId) {
+      return false
+    }
+
+    return getLocalParts(new Date(log.sent_at), timezone).dateKey === currentDateKey
+  })
+}
+
+export function hasSentNotificationToday(
   userId: string,
   settings: NotificationSettingsRow,
   logs: NotificationLogRow[],
