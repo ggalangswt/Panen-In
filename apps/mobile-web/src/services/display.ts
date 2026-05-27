@@ -45,6 +45,28 @@ export function formatForecastDay(value: string) {
   }).format(date);
 }
 
+export function groupForecastByDay<T extends { dt_txt: string }>(items: T[], limit = 5) {
+  const grouped: T[] = [];
+  const seenDates = new Set<string>();
+
+  for (const item of items) {
+    const dateKey = item.dt_txt.slice(0, 10);
+
+    if (seenDates.has(dateKey)) {
+      continue;
+    }
+
+    seenDates.add(dateKey);
+    grouped.push(item);
+
+    if (grouped.length >= limit) {
+      break;
+    }
+  }
+
+  return grouped;
+}
+
 export function getWeatherIconSrc(condition: string) {
   const normalized = condition.toLowerCase();
 

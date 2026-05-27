@@ -15,6 +15,7 @@ import {
 } from "@/services/panenin-api";
 import {
   formatForecastDay,
+  groupForecastByDay,
   getWeatherIconSrc,
   getWeatherMetrics,
 } from "@/services/display";
@@ -63,19 +64,24 @@ export default function WeatherPage() {
   }, []);
 
   const forecastItems = weatherResponse?.data.data_cuaca.list ?? [];
-  const selectedDay: WeatherForecastItem | null = forecastItems[selectedIndex] ?? forecastItems[0] ?? null;
+  const dailyForecastItems = useMemo(
+    () => groupForecastByDay(forecastItems, 5),
+    [forecastItems],
+  );
+  const selectedDay: WeatherForecastItem | null =
+    dailyForecastItems[selectedIndex] ?? dailyForecastItems[0] ?? null;
   const adviceItems = weatherResponse?.data.rekomendasi_ai ? [weatherResponse.data.rekomendasi_ai] : [];
 
   const forecastCards = useMemo(
     () =>
-      forecastItems.map((item, index) => ({
+      dailyForecastItems.map((item, index) => ({
         id: `${item.dt}-${index}`,
         day: index === 0 ? "Hari ini" : formatForecastDay(item.dt_txt),
         temp: `${Math.round(item.main.temp)}°C`,
         iconSrc: getWeatherIconSrc(item.weather[0]?.description ?? ""),
         iconAlt: item.weather[0]?.description ?? "Cuaca",
       })),
-    [forecastItems],
+    [dailyForecastItems],
   );
 
   return (

@@ -67,6 +67,6 @@ export async function getCuaca(kabupaten: string) {
       dt_txt: string
     }>
   }>(
-    `${BASE_URL}/forecast?lat=${coordinates.lat}&lon=${coordinates.lon}&appid=${getOpenWeatherApiKey()}&units=metric&lang=id&cnt=5`,
+    `${BASE_URL}/forecast?lat=${coordinates.lat}&lon=${coordinates.lon}&appid=${getOpenWeatherApiKey()}&units=metric&lang=id&cnt=40`,
   )
 }
